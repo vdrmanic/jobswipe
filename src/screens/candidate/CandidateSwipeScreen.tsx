@@ -23,11 +23,17 @@ import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 import { JobListing } from '../../types';
 import { COLORS } from '../../constants';
+import DiscoveryFilterModal from '../../components/DiscoveryFilterModal';
+import MatchScorePill from '../../components/MatchScorePill';
+import { discoveryService, notificationService, safetyService } from '../../services';
+import { defaultDiscoveryFilters, jobPassesFilters, scoreJobForCandidate } from '../../utils/matching';
+import { CandidateProfile, DiscoveryFilters, MatchScore } from '../../types';
 
 type JobWithCompany = JobListing & {
   companyName?: string;
   companyIndustry?: string | null;
   companyAvatar?: string | null;
+  matchScore: MatchScore;
 };
 
 const LOCAL_CITY_COORDS: Array<{ keys: string[]; lat: number; lon: number }> = [
@@ -87,6 +93,8 @@ export default function CandidateSwipeScreen({navigation}: any) {
   const [jobModalVisible, setJobModalVisible] = useState(false);
   const [matchName, setMatchName] = useState<string | null>(null);
   const [matchedJob, setMatchedJob] = useState<JobWithCompany | null>(null);
+  const [filters, setFilters] = useState<DiscoveryFilters>(defaultDiscoveryFilters);
+  const [filtersVisible, setFiltersVisible] = useState(false);
   const [distanceLabel, setDistanceLabel] = useState<string | null>(null);
   const distanceCacheRef = useRef({ candidateLocation: '', jobLocation: '' });
   const geocodeCacheRef = useRef<Record<string, { lat: number; lon: number } | null>>({});
@@ -96,14 +104,19 @@ export default function CandidateSwipeScreen({navigation}: any) {
   const [jobMapProviderIndex, setJobMapProviderIndex] = useState(0);
   const [jobMapLayout, setJobMapLayout] = useState({ width: 320, height: 260 });
   const failedMapProvidersRef = useRef<Set<number>>(new Set());
-  const matchAnim = useRef(new Animated.Value(1)).current;
   const jobPinAnimation = useRef(new Animated.Value(0)).current;
 
-  const currentJob = jobs[currentIndex];
+  const visibleJobs = jobs.filter((job) => jobPassesFilters(job, filters, job.matchScore.score));
+  const currentJob = visibleJobs[currentIndex];
   const isCompact = height < 760 || width < 380;
   const visibleSkills = currentJob?.skills_required?.slice(0, isCompact ? 4 : 6) || [];
   const hiddenSkillCount = Math.max((currentJob?.skills_required?.length || 0) - visibleSkills.length, 0);
-  const deckProgress = jobs.length > 0 ? Math.min((currentIndex + 1) / jobs.length, 1) : 0;
+  const deckProgress = visibleJobs.length > 0 ? Math.min((currentIndex + 1) / visibleJobs.length, 1) : 0;
+
+  useEffect(() => {
+    if (!user) return;
+    discoveryService.loadFilters(user.id, 'candidate').then(setFilters);
+  }, [user?.id]);
 
   const JOB_TILE_ZOOM = 16;
   const JOB_TILE_SIZE = 256;
@@ -289,7 +302,6 @@ export default function CandidateSwipeScreen({navigation}: any) {
   };
 
   useEffect(() => {
-    let active = true;
     if (!jobLocationCoords) return undefined;
 
     const anim = Animated.loop(
@@ -309,103 +321,9 @@ export default function CandidateSwipeScreen({navigation}: any) {
     anim.start();
 
     return () => {
-      active = false;
       anim.stop();
     };
   }, [jobLocationCoords, jobPinAnimation]);
-
-  const legacyMatchOverlay = matchVisible && matchedJob ? (
-    <Animated.View style={[styles.matchOverlay, { opacity: matchAnim }]}>
-      <View style={styles.matchOverlayBlur} />
-
-      <Animated.View style={styles.matchPeopleRow}>
-        <Animated.View
-          style={[
-            styles.matchPerson,
-            {
-              transform: [
-                {
-                  translateX: matchAnim.interpolate({ inputRange: [0, 1], outputRange: [-40, 0] }),
-                },
-              ],
-              opacity: matchAnim,
-            },
-          ]}
-        >
-          <View style={styles.matchAvatarBox}>
-            {profile?.avatar_url ? (
-              <Image source={{ uri: profile.avatar_url }} style={styles.matchAvatar} />
-            ) : (
-              <Text style={styles.matchAvatarIcon}>👤</Text>
-            )}
-          </View>
-          <Text style={styles.matchLabel}>Kandidat</Text>
-          <Text style={styles.matchPersonName}>{profile?.full_name || 'Ti'}</Text>
-        </Animated.View>
-
-        <Animated.Text
-          style={[
-            styles.matchHandshake,
-            {
-              transform: [
-                {
-                  scale: matchAnim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1.1] }),
-                },
-              ],
-              opacity: matchAnim,
-            },
-          ]}
-        >
-          🤝
-        </Animated.Text>
-
-        <Animated.View
-          style={[
-            styles.matchPerson,
-            {
-              transform: [
-                {
-                  translateX: matchAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }),
-                },
-              ],
-              opacity: matchAnim,
-            },
-          ]}
-        >
-          <View style={styles.matchAvatarBox}>
-            {matchedJob.companyAvatar ? (
-              <Image source={{ uri: matchedJob.companyAvatar }} style={styles.matchAvatar} />
-            ) : (
-              <Text style={styles.matchAvatarIcon}>🏢</Text>
-            )}
-          </View>
-          <Text style={styles.matchLabel}>Firma</Text>
-          <Text style={styles.matchPersonName}>{matchedJob.companyName}</Text>
-        </Animated.View>
-      </Animated.View>
-
-      <Animated.View
-        style={[
-          styles.matchCard,
-          {
-            transform: [
-              {
-                scale: matchAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }),
-              },
-              {
-                translateY: matchAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }),
-              },
-            ],
-            opacity: matchAnim,
-          },
-        ]}
-      >
-        <Text style={styles.matchTitle}>Nova veza!</Text>
-        <Text style={styles.matchName}>{matchName}</Text>
-        <Text style={styles.matchSubtitle}>Kandidat i firma su se povezali.</Text>
-      </Animated.View>
-    </Animated.View>
-  ) : null;
 
   const matchOverlay = (
     <MatchCelebration
@@ -439,6 +357,14 @@ export default function CandidateSwipeScreen({navigation}: any) {
     }
 
     setLoading(true);
+    const blockedIds = await safetyService.fetchBlockedIds(user.id);
+
+    const { data: candidateData } = await supabase
+      .from('candidate_profiles')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle();
+    const candidateProfile = (candidateData || { position: null, skills: [], job_type: [] }) as CandidateProfile;
 
     const { data: swipedData, error: swipesError } = await supabase
       .from('swipes')
@@ -474,7 +400,8 @@ export default function CandidateSwipeScreen({navigation}: any) {
       return;
     }
 
-    const companyIds = [...new Set((jobsData || []).map((job) => job.company_id))];
+    const availableJobs = (jobsData || []).filter((job) => !blockedIds.includes(job.company_id));
+    const companyIds = [...new Set(availableJobs.map((job) => job.company_id))];
 
     let companyMap: Record<
       string,
@@ -519,11 +446,12 @@ export default function CandidateSwipeScreen({navigation}: any) {
       }, {} as Record<string, { company_name: string | null; industry: string | null; avatar_url: string | null }>);
     }
 
-    const preparedJobs: JobWithCompany[] = (jobsData || []).map((job) => ({
+    const preparedJobs: JobWithCompany[] = availableJobs.map((job) => ({
       ...job,
       companyName: companyMap[job.company_id]?.company_name || 'Firma',
       companyIndustry: companyMap[job.company_id]?.industry || null,
       companyAvatar: companyMap[job.company_id]?.avatar_url || null,
+      matchScore: scoreJobForCandidate(job, candidateProfile, profile?.location),
     }));
 
     setJobs(preparedJobs);
@@ -681,6 +609,7 @@ export default function CandidateSwipeScreen({navigation}: any) {
     setMatchedJob(currentJob);
     setMatchName(currentJob?.companyName || 'Firma');
     setMatchVisible(true);
+    notificationService.dispatchPending().catch(() => null);
 
     return true;
   };
@@ -714,7 +643,7 @@ export default function CandidateSwipeScreen({navigation}: any) {
     setCurrentIndex((prev) => prev + 1);
 
     // Ako nema više poslova, osvezi listu
-    if (currentIndex + 1 >= jobs.length) {
+    if (currentIndex + 1 >= visibleJobs.length) {
       setLoading(true);
       await fetchJobs();
     }
@@ -748,7 +677,23 @@ export default function CandidateSwipeScreen({navigation}: any) {
         <TouchableOpacity style={styles.refreshButton} onPress={fetchJobs}>
           <Text style={styles.refreshButtonText}>Osveži</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.emptyFilterButton} onPress={() => setFiltersVisible(true)}>
+          <Ionicons name="options" size={18} color={COLORS.primarySoft} />
+          <Text style={styles.emptyFilterText}>Promeni filtere</Text>
+        </TouchableOpacity>
         {matchOverlay}
+        <DiscoveryFilterModal
+          visible={filtersVisible}
+          mode="candidate"
+          value={filters}
+          onClose={() => setFiltersVisible(false)}
+          onApply={(next) => {
+            setFilters(next);
+            setCurrentIndex(0);
+            setFiltersVisible(false);
+            discoveryService.saveFilters(user.id, 'candidate', next);
+          }}
+        />
       </View>
     );
   }
@@ -778,7 +723,10 @@ export default function CandidateSwipeScreen({navigation}: any) {
         </View>
 
         <View style={styles.countPill}>
-          <Text style={styles.countText}>{currentIndex + 1}/{jobs.length}</Text>
+          <TouchableOpacity style={styles.filterButton} onPress={() => setFiltersVisible(true)}>
+            <Ionicons name="options" size={18} color={COLORS.primarySoft} />
+          </TouchableOpacity>
+          <Text style={styles.countText}>{currentIndex + 1}/{visibleJobs.length}</Text>
         </View>
       </View>
 
@@ -860,6 +808,7 @@ export default function CandidateSwipeScreen({navigation}: any) {
                     <Text style={styles.jobTypePillText} numberOfLines={1}>{currentJob.job_type}</Text>
                   </View>
                 )}
+                <MatchScorePill result={currentJob.matchScore} />
               </View>
 
               <TouchableOpacity
@@ -1014,99 +963,19 @@ export default function CandidateSwipeScreen({navigation}: any) {
         </View>
       </Modal>
 
-      {matchVisible && matchedJob && (
-        <Animated.View style={[styles.matchOverlay, { opacity: matchAnim }] }>
-          <View style={styles.matchOverlayBlur} />
-
-          <Animated.View style={styles.matchPeopleRow}>
-            <Animated.View
-              style={[
-                styles.matchPerson,
-                {
-                  transform: [
-                    {
-                      translateX: matchAnim.interpolate({ inputRange: [0, 1], outputRange: [-40, 0] }),
-                    },
-                  ],
-                  opacity: matchAnim,
-                },
-              ]}
-            >
-              <View style={styles.matchAvatarBox}>
-                {profile?.avatar_url ? (
-                  <Image source={{ uri: profile.avatar_url }} style={styles.matchAvatar} />
-                ) : (
-                  <Text style={styles.matchAvatarIcon}>👤</Text>
-                )}
-              </View>
-              <Text style={styles.matchLabel}>Kandidat</Text>
-              <Text style={styles.matchPersonName}>{profile?.full_name || 'Ti'}</Text>
-            </Animated.View>
-
-            <Animated.Text
-              style={[
-                styles.matchHandshake,
-                {
-                  transform: [
-                    {
-                      scale: matchAnim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1.1] }),
-                    },
-                  ],
-                  opacity: matchAnim,
-                },
-              ]}
-            >
-              🤝
-            </Animated.Text>
-
-            <Animated.View
-              style={[
-                styles.matchPerson,
-                {
-                  transform: [
-                    {
-                      translateX: matchAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }),
-                    },
-                  ],
-                  opacity: matchAnim,
-                },
-              ]}
-            >
-              <View style={styles.matchAvatarBox}>
-                {matchedJob.companyAvatar ? (
-                  <Image source={{ uri: matchedJob.companyAvatar }} style={styles.matchAvatar} />
-                ) : (
-                  <Text style={styles.matchAvatarIcon}>🏢</Text>
-                )}
-              </View>
-              <Text style={styles.matchLabel}>Firma</Text>
-              <Text style={styles.matchPersonName}>{matchedJob.companyName}</Text>
-            </Animated.View>
-          </Animated.View>
-
-          <Animated.View
-            style={[
-              styles.matchCard,
-              {
-                transform: [
-                  {
-                    scale: matchAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }),
-                  },
-                  {
-                    translateY: matchAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }),
-                  },
-                ],
-                opacity: matchAnim,
-              },
-            ]}
-          >
-            <Text style={styles.matchTitle}>Nova veza!</Text>
-            <Text style={styles.matchName}>{matchName}</Text>
-            <Text style={styles.matchSubtitle}>Kandidat i firma su se povezali.</Text>
-          </Animated.View>
-        </Animated.View>
-      )}
       {matchOverlay}
+      <DiscoveryFilterModal
+        visible={filtersVisible}
+        mode="candidate"
+        value={filters}
+        onClose={() => setFiltersVisible(false)}
+        onApply={(next) => {
+          setFilters(next);
+          setCurrentIndex(0);
+          setFiltersVisible(false);
+          if (user) discoveryService.saveFilters(user.id, 'candidate', next);
+        }}
+      />
     </View>
   );
 }
@@ -1138,10 +1007,6 @@ const styles = StyleSheet.create({
       },
     }),
     elevation: 14,
-  },
-  cardScrollContent: {
-    padding: 0,
-    paddingBottom: 22,
   },
   mapHero: {
     ...StyleSheet.absoluteFill,
@@ -1207,36 +1072,6 @@ const styles = StyleSheet.create({
     marginRight: 12,
     backgroundColor: '#161A28',
   },
-  brandRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  brand: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  brandAccent: {
-    color: '#ff3b6b',
-  },
-  topIcon: {
-    color: '#aaa',
-    fontSize: 22,
-  },
-  imageLarge: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    alignSelf: 'center',
-    marginBottom: 28,
-  },
-  infoPanel: {
-    backgroundColor: 'rgba(0,0,0,0.72)',
-    borderRadius: 18,
-    padding: 16,
-  },
   logoFallback: {
     width: 64,
     height: 64,
@@ -1274,16 +1109,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   title: { color: '#fff', fontSize: 25, fontWeight: '900', marginBottom: 10, lineHeight: 31 },
-  overlayAccent: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 10,
-    backgroundColor: 'rgba(108,99,255,0.14)',
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
-  },
   meta: {
     color: '#DCE2F5',
     fontSize: 13,
@@ -1296,30 +1121,6 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 12,
     overflow: 'hidden',
-  },
-  metaGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 4,
-  },
-  metaPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 999,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    maxWidth: '100%',
-  },
-  metaPillText: {
-    color: '#DCE2F5',
-    fontSize: 12,
-    fontWeight: '800',
-    flexShrink: 1,
   },
   description: { color: '#DCE2F5', fontSize: 13, lineHeight: 20, marginTop: 4 },
   cardTop: {
@@ -1426,13 +1227,6 @@ const styles = StyleSheet.create({
   hiddenMapCard: {
     display: 'none',
   },
-  jobMapLabel: {
-    color: '#E8E3FF',
-    fontSize: 12,
-    fontWeight: '900',
-    marginBottom: 10,
-    textTransform: 'uppercase',
-  },
   jobMapWrapper: {
     width: '100%',
     height: '100%',
@@ -1456,10 +1250,6 @@ const styles = StyleSheet.create({
     width: 256,
     height: 256,
     backgroundColor: '#12121b',
-  },
-  jobStaticMapImage: {
-    width: '100%',
-    height: '100%',
   },
   jobMapMarker: {
     position: 'absolute',
@@ -1495,9 +1285,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
   },
-  jobMapFallbackCompact: {
-    height: 128,
-  },
   jobMapFallbackText: {
     color: '#aaa',
     fontSize: 13,
@@ -1505,7 +1292,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
     lineHeight: 18,
   },
-  counter: { color: '#666', textAlign: 'center', marginTop: 12 },
   emptyTitle: { color: '#fff', fontSize: 24, fontWeight: 'bold', marginBottom: 8 },
   emptyText: { color: '#888', textAlign: 'center', marginTop: 8, marginBottom: 24 },
   refreshButton: {
@@ -1515,6 +1301,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   refreshButtonText: { color: '#fff', fontWeight: 'bold' },
+  emptyFilterButton: { flexDirection: 'row', alignItems: 'center', gap: 7, padding: 13, marginTop: 8 },
+  emptyFilterText: { color: COLORS.primarySoft, fontWeight: '900' },
   discoveryHeader: {
     width: '100%',
     paddingBottom: 14,
@@ -1568,8 +1356,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.10)',
     justifyContent: 'center',
     alignItems: 'center',
+    flexDirection: 'row',
   },
   countText: { color: COLORS.primarySoft, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  filterButton: { width: 32, height: 32, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.glass, marginRight: 6 },
   progressTrack: {
     width: '100%',
     height: 3,
@@ -1582,57 +1372,6 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 999,
     backgroundColor: COLORS.primary,
-  },
-  actionButton: {
-    width: 62,
-    height: 62,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#222',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    boxShadow: '0px 10px 24px rgba(0, 0, 0, 0.18)',
-    marginHorizontal: 10,
-    elevation: 10,
-    ...Platform.select({
-      default: {
-        shadowColor: '#000',
-        shadowOpacity: 0.22,
-        shadowRadius: 16,
-        shadowOffset: { width: 0, height: 10 },
-      },
-    }),
-  },
-  actionButtonLeft: {
-    borderColor: '#ff5a64',
-    backgroundColor: 'rgba(255, 59, 71, 0.16)',
-    boxShadow: '0px 0px 18px rgba(255, 59, 71, 0.2)',
-  },
-  actionButtonCenter: {
-    borderColor: '#4ddcff',
-    backgroundColor: 'rgba(0, 217, 255, 0.16)',
-    boxShadow: '0px 0px 18px rgba(0, 217, 255, 0.2)',
-  },
-  actionButtonRight: {
-    borderColor: '#ff6fc7',
-    backgroundColor: 'rgba(255, 20, 147, 0.18)',
-    boxShadow: '0px 0px 18px rgba(255, 20, 147, 0.22)',
-  },
-  actionEmoji: {
-    fontSize: 28,
-  },
-  actionsRow: {
-    display: 'none',
-  },
-  actionsOverlay: {
-    position: 'absolute',
-    bottom: 10,
-    width: '100%',
-    paddingBottom: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    alignItems: 'center',
   },
   jobModalOverlay: {
     flex: 1,
@@ -1778,127 +1517,4 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontWeight: '900',
   },
-  swipeHint: {
-    color: '#777',
-    textAlign: 'center',
-    marginTop: 16,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  matchOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 9999,
-    elevation: 999,
-    overflow: 'hidden',
-  },
-  matchOverlayBlur: {
-    ...Platform.select({
-      web: {
-        backdropFilter: 'blur(12px)',
-      },
-    }),
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-  },
-  matchPeopleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 22,
-  },
-  matchPerson: {
-    alignItems: 'center',
-    marginHorizontal: 14,
-    transform: [{ perspective: 600 }, { rotateX: '4deg' }],
-  },
-  matchAvatarBox: {
-    width: 118,
-    height: 118,
-    borderRadius: 60,
-    backgroundColor: '#14141d',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 12,
-  },
-  matchAvatar: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-  },
-  matchAvatarIcon: {
-    fontSize: 52,
-  },
-  matchLabel: {
-    color: '#8b8cff',
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 6,
-    letterSpacing: 0.4,
-  },
-  matchPersonName: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-  matchHandshake: {
-    fontSize: 56,
-    marginHorizontal: 18,
-    ...Platform.select({
-      web: {
-        textShadow: '0px 8px 20px rgba(255,255,255,0.22)',
-      },
-      default: {
-        textShadowColor: 'rgba(255,255,255,0.22)',
-        textShadowOffset: { width: 0, height: 8 },
-        textShadowRadius: 20,
-      },
-    }),
-  },
-  matchCard: {
-    backgroundColor: '#111',
-    padding: 24,
-    borderRadius: 26,
-    alignItems: 'center',
-    minWidth: 300,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    ...Platform.select({
-      web: {
-        boxShadow: '0px 0px 20px rgba(0, 0, 0, 0.24)',
-      },
-      default: {
-        shadowColor: '#000',
-        shadowOpacity: 0.28,
-        shadowRadius: 20,
-        shadowOffset: { width: 0, height: 12 },
-      },
-    }),
-    elevation: 14,
-  },
-  matchHeart: {
-    fontSize: 72,
-    marginBottom: 12,
-  },
-  matchTitle: { color: '#fff', fontSize: 22, fontWeight: '900' },
-  matchName: { color: '#fff', marginTop: 8, fontSize: 16, fontWeight: '700' },
-  matchSubtitle: { color: '#cbd5e1', marginTop: 8, fontSize: 13, textAlign: 'center', lineHeight: 18 },
 });

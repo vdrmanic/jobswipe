@@ -17,6 +17,8 @@ import { supabase } from '../../lib/supabase';
 import { ExperienceItem, ExperienceVerification } from '../../types';
 import { findExperienceVerification, verificationService } from '../../services/verificationService';
 import { COLORS } from '../../constants';
+import { useAuth } from '../../hooks/useAuth';
+import ReportUserModal from '../../components/ReportUserModal';
 
 type InfoCardProps = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -41,6 +43,8 @@ function InfoCard({ icon, label, value }: InfoCardProps) {
 export default function ViewProfileScreen({ route, navigation }: any) {
   const { profileId, userType } = route.params;
   const { width } = useWindowDimensions();
+  const { user } = useAuth();
+  const [safetyVisible, setSafetyVisible] = useState(false);
   const [baseProfile, setBaseProfile] = useState<any>(null);
   const [details, setDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -169,7 +173,7 @@ export default function ViewProfileScreen({ route, navigation }: any) {
 
         {isCompany ? (
           <View style={[styles.contentGrid, isWide && styles.contentGridWide]}>
-            <View style={styles.mainColumn}>
+            <View style={[styles.mainColumn, isWide && styles.mainColumnWide]}>
               <View style={styles.section}>
                 <View style={styles.sectionHeadingRow}>
                   <View style={styles.sectionHeadingIcon}>
@@ -198,7 +202,7 @@ export default function ViewProfileScreen({ route, navigation }: any) {
               </LinearGradient>
             </View>
 
-            <View style={styles.sideColumn}>
+            <View style={[styles.sideColumn, isWide && styles.sideColumnWide]}>
               <View style={styles.section}>
                 <Text style={styles.sectionEyebrow}>BRZI PREGLED</Text>
                 <Text style={styles.sectionTitle}>Kompanija ukratko</Text>
@@ -278,7 +282,23 @@ export default function ViewProfileScreen({ route, navigation }: any) {
             </View>
           </View>
         )}
+
+        {user?.id !== profileId && (
+          <TouchableOpacity style={styles.safetyButton} onPress={() => setSafetyVisible(true)}>
+            <Ionicons name="shield-outline" size={18} color={COLORS.secondary} />
+            <Text style={styles.safetyText}>Prijavi ili blokiraj korisnika</Text>
+          </TouchableOpacity>
+        )}
       </View>
+      {!!user && (
+        <ReportUserModal
+          visible={safetyVisible}
+          currentUserId={user.id}
+          reportedUserId={profileId}
+          onClose={() => setSafetyVisible(false)}
+          onBlocked={goBack}
+        />
+      )}
     </ScrollView>
   );
 }
@@ -318,8 +338,10 @@ const styles = StyleSheet.create({
   quickFactText: { color: COLORS.textSoft, fontSize: 12, fontWeight: '700' },
   contentGrid: { gap: 16 },
   contentGridWide: { flexDirection: 'row', alignItems: 'flex-start' },
-  mainColumn: { flex: 1.25, gap: 16 },
-  sideColumn: { flex: 0.75 },
+  mainColumn: { gap: 16 },
+  mainColumnWide: { flex: 1.25 },
+  sideColumn: { width: '100%' },
+  sideColumnWide: { flex: 0.75, width: 'auto' },
   candidateContent: { gap: 16 },
   section: { padding: 22, borderRadius: 24, borderCurve: 'continuous', borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.card, boxShadow: '0px 16px 36px rgba(0,0,0,0.16)' },
   sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -357,4 +379,6 @@ const styles = StyleSheet.create({
   experienceDuration: { color: COLORS.primarySoft, fontSize: 12, fontWeight: '800', marginTop: 8 },
   experienceDescription: { color: COLORS.textMuted, lineHeight: 20, marginTop: 7 },
   emptyText: { color: COLORS.textMuted },
+  safetyButton: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, padding: 13, marginTop: 4 },
+  safetyText: { color: COLORS.secondary, fontSize: 12, fontWeight: '900' },
 });

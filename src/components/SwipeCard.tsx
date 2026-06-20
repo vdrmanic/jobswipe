@@ -192,15 +192,6 @@ const styles = StyleSheet.create({
   inner: {
     flex: 1,
   },
-  feedbackOverlay: {
-    // kept for compatibility, replaced by gradientAccent
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: '55%',
-    borderRadius: 34,
-    zIndex: 1,
-  },
   gradientAccent: {
     position: 'absolute',
     bottom: 12,
@@ -237,15 +228,6 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 8 },
       },
     }),
-  },
-  statusBadge: {
-    position: 'absolute',
-    top: 18,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 28,
-    borderWidth: 1.5,
-    zIndex: 2,
   },
   statusText: {
     color: '#fff',

@@ -17,9 +17,11 @@ import { supabase } from '../../lib/supabase';
 import { COLORS } from '../../constants';
 import { ExperienceItem, ExperienceVerification } from '../../types';
 import { findExperienceVerification, verificationService } from '../../services/verificationService';
+import { useNotifications } from '../../hooks/useNotifications';
 
 export default function ProfileScreen({ navigation }: any) {
   const { user, profile, signOut, refreshProfile } = useAuth();
+  const { unread } = useNotifications();
 
   const [details, setDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -89,9 +91,15 @@ export default function ProfileScreen({ navigation }: any) {
               <Text style={styles.kicker}>{isCompany ? 'Company workspace' : 'Candidate workspace'}</Text>
               <Text style={styles.header}>Moj profil</Text>
             </View>
-            <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate('EditProfile')}>
-              <Ionicons name="create-outline" size={22} color={COLORS.primarySoft} />
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate('Notifications')}>
+                <Ionicons name="notifications-outline" size={22} color={COLORS.primarySoft} />
+                {unread > 0 && <View style={styles.notificationBadge}><Text style={styles.notificationBadgeText}>{Math.min(unread, 99)}</Text></View>}
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate('EditProfile')}>
+                <Ionicons name="create-outline" size={22} color={COLORS.primarySoft} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <LinearGradient colors={['rgba(124,92,255,0.26)', 'rgba(54,209,220,0.12)']} style={styles.heroCard}>
@@ -119,7 +127,7 @@ export default function ProfileScreen({ navigation }: any) {
           </LinearGradient>
 
           {isVerificationAdmin && (
-            <TouchableOpacity style={styles.adminButton} onPress={() => navigation.navigate('VerificationAdmin')}>
+            <><TouchableOpacity style={styles.adminButton} onPress={() => navigation.navigate('VerificationAdmin')}>
               <Ionicons name="shield-checkmark-outline" size={20} color="#6ee7b7" />
               <View style={styles.adminButtonCopy}>
                 <Text style={styles.adminButtonTitle}>Provera dokumenata</Text>
@@ -127,6 +135,11 @@ export default function ProfileScreen({ navigation }: any) {
               </View>
               <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
             </TouchableOpacity>
+            <TouchableOpacity style={styles.adminButton} onPress={() => navigation.navigate('ReportsAdmin')}>
+              <Ionicons name="warning-outline" size={20} color={COLORS.secondary} />
+              <View style={styles.adminButtonCopy}><Text style={styles.adminButtonTitle}>Prijave korisnika</Text><Text style={styles.adminButtonText}>Otvori moderation red</Text></View>
+              <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
+            </TouchableOpacity></>
           )}
 
           {isCompany ? (
@@ -277,6 +290,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerActions: { flexDirection: 'row', gap: 8 },
+  notificationBadge: { position: 'absolute', right: -4, top: -5, minWidth: 19, height: 19, borderRadius: 10, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.secondary },
+  notificationBadgeText: { color: COLORS.white, fontSize: 9, fontWeight: '900' },
   heroCard: {
     width: '100%',
     borderRadius: 30,

@@ -15,6 +15,8 @@ import ProfileScreen from '../screens/shared/ProfileScreen';
 import ViewProfileScreen from '../screens/shared/ViewProfileScreen';
 import ExperienceVerificationScreen from '../screens/shared/ExperienceVerificationScreen';
 import VerificationAdminScreen from '../screens/admin/VerificationAdminScreen';
+import NotificationsScreen from '../screens/shared/NotificationsScreen';
+import ReportsAdminScreen from '../screens/admin/ReportsAdminScreen';
 
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useAuth } from '../hooks/useAuth';
@@ -63,6 +65,8 @@ function ProfileStack() {
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="ExperienceVerification" component={ExperienceVerificationScreen} />
       <Stack.Screen name="VerificationAdmin" component={VerificationAdminScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="ReportsAdmin" component={ReportsAdminScreen} />
     </Stack.Navigator>
   );
 }
@@ -76,7 +80,7 @@ export default function MainTabs() {
     <Tab.Navigator
       screenOptions={({ route }) => {
         const focusedRoute = getFocusedRouteNameFromRoute(route);
-        const hideTabBar = ['Chat', 'ExperienceVerification', 'VerificationAdmin'].includes(focusedRoute || '');
+        const hideTabBar = ['Chat', 'ViewProfile', 'ExperienceVerification', 'VerificationAdmin', 'Notifications', 'ReportsAdmin'].includes(focusedRoute || '');
 
         return {
         headerShown: false,

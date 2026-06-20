@@ -100,3 +100,52 @@ export interface SwipeAction {
   target_type: 'job' | 'candidate';
   direction: 'left' | 'right' | 'super';
 }
+
+export type DiscoveryMode = 'candidate' | 'company';
+
+export interface DiscoveryFilters {
+  position: string;
+  location: string;
+  jobTypes: string[];
+  skills: string[];
+  experienceLevels: string[];
+  verifiedOnly: boolean;
+  minimumScore: number;
+}
+
+export interface MatchScore {
+  score: number;
+  reasons: string[];
+  matchedSkills: string[];
+}
+
+export type AppNotificationType = 'match' | 'message' | 'verification' | 'system';
+
+export interface AppNotification {
+  id: string;
+  user_id: string;
+  type: AppNotificationType;
+  title: string;
+  body: string;
+  data: Record<string, unknown>;
+  read_at: string | null;
+  created_at: string;
+}
+
+export type ReportStatus = 'pending' | 'reviewed' | 'dismissed' | 'actioned';
+
+export interface UserReport {
+  id: string;
+  reporter_id: string;
+  reported_user_id: string;
+  match_id: string | null;
+  reason: string;
+  details: string | null;
+  status: ReportStatus;
+  admin_note: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  reporter?: Pick<Profile, 'full_name'>;
+  reported_user?: Pick<Profile, 'full_name' | 'user_type'>;
+}

@@ -17,10 +17,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 import { COLORS } from '../../constants';
+import ReportUserModal from '../../components/ReportUserModal';
+import { notificationService } from '../../services';
 
 export default function ChatScreen({ route, navigation }: any) {
   const { match } = route.params;
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
 
@@ -28,6 +30,21 @@ export default function ChatScreen({ route, navigation }: any) {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [safetyVisible, setSafetyVisible] = useState(false);
+  const otherUserId = match.candidate_id === user?.id ? match.company_id : match.candidate_id;
+  const jobTitle = match.jobTitle || match.job_listings?.title || 'ovu poziciju';
+  const otherName = match.otherName || 'zdravo';
+  const firstMessageSuggestions = profile?.user_type === 'company'
+    ? [
+        `Zdravo ${otherName}! Hvala na interesovanju za poziciju ${jobTitle}. Da li vam odgovara kratak razgovor?`,
+        `Pozdrav! Vaš profil nam je privukao pažnju. Kada ste dostupni za razgovor o poziciji ${jobTitle}?`,
+        `Zdravo! Voleli bismo da saznamo više o vašem iskustvu. Da li možemo da dogovorimo kratak poziv?`,
+      ]
+    : [
+        `Zdravo! Hvala na matchu. Mozete li mi reci vise o poziciji ${jobTitle}?`,
+        `Pozdrav! Kada bi vam odgovarao kratak razgovor o poziciji ${jobTitle}?`,
+        'Zdravo! Koji su sledeći koraci u procesu selekcije?',
+      ];
 
   const loadMessages = async () => {
     const { data } = await supabase
@@ -102,6 +119,7 @@ export default function ChatScreen({ route, navigation }: any) {
     if (!error) {
       setMessage('');
       loadMessages();
+      notificationService.dispatchPending().catch(() => null);
     }
 
     setSending(false);
@@ -136,6 +154,9 @@ export default function ChatScreen({ route, navigation }: any) {
           <Text style={styles.header} numberOfLines={1}>{match.otherName || 'Chat'}</Text>
           <Text style={styles.profileHint}>Pogledaj profil</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.moreButton} onPress={() => setSafetyVisible(true)}>
+          <Ionicons name="ellipsis-vertical" size={20} color={COLORS.textMuted} />
+        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -152,6 +173,28 @@ export default function ChatScreen({ route, navigation }: any) {
           );
         }}
       />
+
+      {messages.length === 0 && (
+        <View style={styles.suggestionsPanel}>
+          <View style={styles.suggestionsHeader}>
+            <View style={styles.suggestionsIcon}>
+              <Ionicons name="sparkles" size={17} color={COLORS.gold} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.suggestionsTitle}>Predlog prve poruke</Text>
+              <Text style={styles.suggestionsHint}>Izaberi predlog, izmeni ga ako želiš i pošalji.</Text>
+            </View>
+          </View>
+          <View style={styles.suggestionsList}>
+            {firstMessageSuggestions.map((suggestion) => (
+              <TouchableOpacity key={suggestion} style={styles.suggestion} onPress={() => setMessage(suggestion)}>
+                <Text style={styles.suggestionText} numberOfLines={2}>{suggestion}</Text>
+                <Ionicons name="arrow-forward" size={16} color={COLORS.primarySoft} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
 
       <View style={[styles.inputRow, { paddingBottom: Math.max(insets.bottom, 14) }]}>
         <TextInput
@@ -170,6 +213,16 @@ export default function ChatScreen({ route, navigation }: any) {
           )}
         </TouchableOpacity>
       </View>
+      {!!user && (
+        <ReportUserModal
+          visible={safetyVisible}
+          currentUserId={user.id}
+          reportedUserId={otherUserId}
+          matchId={match.id}
+          onClose={() => setSafetyVisible(false)}
+          onBlocked={() => navigation.goBack()}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -204,6 +257,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitleWrap: { flex: 1 },
+  moreButton: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.glass },
   header: {
     color: COLORS.white,
     fontSize: 22,
@@ -237,6 +291,14 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 8,
   },
   messageText: { color: COLORS.white, fontSize: 15, lineHeight: 22 },
+  suggestionsPanel: { marginHorizontal: 14, marginBottom: 10, padding: 13, borderRadius: 18, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border },
+  suggestionsHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  suggestionsIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(248,196,92,0.12)' },
+  suggestionsTitle: { color: COLORS.white, fontSize: 14, fontWeight: '900' },
+  suggestionsHint: { color: COLORS.textMuted, fontSize: 10, marginTop: 2 },
+  suggestionsList: { gap: 7 },
+  suggestion: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 13, backgroundColor: COLORS.glass, borderWidth: 1, borderColor: COLORS.border },
+  suggestionText: { color: COLORS.textSoft, flex: 1, fontSize: 11, lineHeight: 16, fontWeight: '700' },
   inputRow: {
     flexDirection: 'row',
     padding: 14,

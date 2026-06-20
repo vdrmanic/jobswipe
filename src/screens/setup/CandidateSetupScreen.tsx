@@ -361,11 +361,6 @@ const styles = StyleSheet.create({
   categoryButtonTextActive: {
     color: '#fff',
   },
-  skillsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 12,
-  },
   skillChip: {
     borderWidth: 1,
     borderColor: '#333',

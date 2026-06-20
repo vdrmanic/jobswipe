@@ -6,3 +6,6 @@ export * from './swipeService';
 export * from './candidateService';
 export * from './companyService';
 export * from './verificationService';
+export * from './discoveryService';
+export * from './notificationService';
+export * from './safetyService';
