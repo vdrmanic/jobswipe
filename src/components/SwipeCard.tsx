@@ -5,6 +5,7 @@ import {
   Platform,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,9 +14,10 @@ type SwipeCardProps = {
   children: ReactNode;
   onSwipeLeft: () => void;
   onSwipeRight: () => void;
+  bottomSpacing?: number;
 };
 
-export default function SwipeCard({ children, onSwipeLeft, onSwipeRight }: SwipeCardProps) {
+export default function SwipeCard({ children, onSwipeLeft, onSwipeRight, bottomSpacing = 100 }: SwipeCardProps) {
   const position = useRef(new Animated.ValueXY()).current;
 
   // Reset position when callbacks change (new card)
@@ -85,6 +87,9 @@ export default function SwipeCard({ children, onSwipeLeft, onSwipeRight }: Swipe
         onMoveShouldSetPanResponder: (_, gesture) => {
           return Math.abs(gesture.dx) > 10 && Math.abs(gesture.dx) > Math.abs(gesture.dy);
         },
+        onMoveShouldSetPanResponderCapture: (_, gesture) => {
+          return Math.abs(gesture.dx) > 10 && Math.abs(gesture.dx) > Math.abs(gesture.dy);
+        },
         onPanResponderMove: (_, gesture) => {
           position.setValue({ x: gesture.dx, y: gesture.dy * 0.35 });
         },
@@ -121,12 +126,19 @@ export default function SwipeCard({ children, onSwipeLeft, onSwipeRight }: Swipe
   );
 
 
+  const { width, height } = useWindowDimensions();
+  const cardWidth = Math.min(Math.max(width * 0.9, 320), 430);
+  const cardHeight = Math.min(Math.max(height * 0.68, 520), 680);
+
   return (
     <Animated.View
       {...panResponder.panHandlers}
       style={[
         styles.wrapper,
         {
+          width: cardWidth,
+          height: cardHeight,
+          marginBottom: bottomSpacing,
           transform: [
             { translateX: position.x },
             { translateY: position.y },
@@ -163,10 +175,9 @@ export default function SwipeCard({ children, onSwipeLeft, onSwipeRight }: Swipe
 
 const styles = StyleSheet.create({
   wrapper: {
-    width: '100%',
-    maxWidth: 420,
-    height: 640,
-    marginBottom: 100,
+    alignSelf: 'center',
+    minWidth: 0,
+    minHeight: 520,
     boxShadow: '0px 18px 24px rgba(0, 0, 0, 0.18)',
     elevation: 12,
     ...Platform.select({

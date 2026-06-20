@@ -10,7 +10,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../hooks/useAuth';
+import { COLORS } from '../../constants';
 
 export default function LoginScreen({ navigation }: any) {
   const [email, setEmail] = useState('');
@@ -20,7 +23,7 @@ export default function LoginScreen({ navigation }: any) {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Greška', 'Unesite email i lozinku');
+      Alert.alert('Greska', 'Unesite email i lozinku');
       return;
     }
 
@@ -29,88 +32,134 @@ export default function LoginScreen({ navigation }: any) {
     setLoading(false);
 
     if (error) {
-      Alert.alert('Greška', error.message);
+      Alert.alert('Greska', error.message);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <View style={styles.inner}>
-        <Text style={styles.logo}>💼</Text>
-        <Text style={styles.title}>JobSwipe</Text>
-        <Text style={styles.subtitle}>Pronađi posao koji te mečuje</Text>
+    <LinearGradient colors={[COLORS.dark, '#111827', '#25133B']} style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.keyboard}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={styles.inner}>
+          <View style={styles.brandMark}>
+            <Ionicons name="briefcase" size={32} color={COLORS.primarySoft} />
+          </View>
+          <Text style={styles.title}>JobSwipe</Text>
+          <Text style={styles.subtitle}>Swajpuj pametnije. Upoznaj posao koji stvarno ima smisla.</Text>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor="#999"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
+          <View style={styles.card}>
+            <View style={styles.field}>
+              <Ionicons name="mail-outline" size={20} color={COLORS.textMuted} />
+              <TextInput
+                style={styles.input}
+                placeholder="Email"
+                placeholderTextColor={COLORS.lightGray}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Lozinka"
-          placeholderTextColor="#999"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
+            <View style={styles.field}>
+              <Ionicons name="lock-closed-outline" size={20} color={COLORS.textMuted} />
+              <TextInput
+                style={styles.input}
+                placeholder="Lozinka"
+                placeholderTextColor={COLORS.lightGray}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+              />
+            </View>
 
-        <TouchableOpacity
-          style={styles.button}
-          onPress={handleLogin}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Prijavi se</Text>
-          )}
-        </TouchableOpacity>
+            <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
+              {loading ? (
+                <ActivityIndicator color={COLORS.white} />
+              ) : (
+                <>
+                  <Text style={styles.buttonText}>Prijavi se</Text>
+                  <Ionicons name="arrow-forward" size={19} color={COLORS.white} />
+                </>
+              )}
+            </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => navigation.navigate('ResetPassword')}>
-          <Text style={[styles.link, { marginBottom: 14 }]}>Zaboravio/la si lozinku?</Text>
-        </TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('ResetPassword')}>
+              <Text style={styles.link}>Zaboravio/la si lozinku?</Text>
+            </TouchableOpacity>
+          </View>
 
-        <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-          <Text style={styles.link}>Nemaš nalog? <Text style={styles.linkBold}>Registruj se</Text></Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+          <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+            <Text style={styles.footerLink}>
+              Nemas nalog? <Text style={styles.linkBold}>Registruj se</Text>
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0a' },
-  inner: { flex: 1, justifyContent: 'center', paddingHorizontal: 32 },
-  logo: { fontSize: 64, textAlign: 'center', marginBottom: 8 },
-  title: { fontSize: 36, fontWeight: 'bold', color: '#fff', textAlign: 'center' },
-  subtitle: { fontSize: 16, color: '#888', textAlign: 'center', marginBottom: 48 },
-  input: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    padding: 16,
-    color: '#fff',
-    fontSize: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#333',
-  },
-  button: {
-    backgroundColor: '#6C63FF',
-    borderRadius: 12,
-    padding: 16,
+  container: { flex: 1 },
+  keyboard: { flex: 1 },
+  inner: { flex: 1, justifyContent: 'center', paddingHorizontal: 24 },
+  brandMark: {
+    width: 74,
+    height: 74,
+    borderRadius: 24,
+    alignSelf: 'center',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
-    marginTop: 8,
+    backgroundColor: COLORS.glass,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 18,
   },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  link: { color: '#888', textAlign: 'center', fontSize: 14 },
-  linkBold: { color: '#6C63FF', fontWeight: 'bold' },
+  title: { fontSize: 40, fontWeight: '900', color: COLORS.white, textAlign: 'center' },
+  subtitle: {
+    fontSize: 16,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    lineHeight: 23,
+    marginTop: 8,
+    marginBottom: 28,
+  },
+  card: {
+    backgroundColor: 'rgba(16, 19, 29, 0.88)',
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 18,
+    gap: 14,
+    boxShadow: '0px 22px 46px rgba(0, 0, 0, 0.28)',
+  },
+  field: {
+    minHeight: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: COLORS.input,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 16,
+  },
+  input: { flex: 1, color: COLORS.white, fontSize: 16 },
+  button: {
+    minHeight: 56,
+    borderRadius: 18,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  buttonText: { color: COLORS.white, fontSize: 16, fontWeight: '900' },
+  link: { color: COLORS.textMuted, textAlign: 'center', fontSize: 14, fontWeight: '700' },
+  footerLink: { color: COLORS.textMuted, textAlign: 'center', fontSize: 15, marginTop: 22 },
+  linkBold: { color: COLORS.primarySoft, fontWeight: '900' },
 });

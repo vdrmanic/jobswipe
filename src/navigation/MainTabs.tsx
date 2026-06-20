@@ -1,5 +1,8 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import CandidateSwipeScreen from '../screens/candidate/CandidateSwipeScreen';
 import CompanyJobsScreen from '../screens/company/CompanyJobsScreen';
@@ -10,9 +13,12 @@ import EditProfileScreen from '../screens/shared/EditProfileScreen';
 import MatchesScreen from '../screens/shared/MatchesScreen';
 import ProfileScreen from '../screens/shared/ProfileScreen';
 import ViewProfileScreen from '../screens/shared/ViewProfileScreen';
+import ExperienceVerificationScreen from '../screens/shared/ExperienceVerificationScreen';
+import VerificationAdminScreen from '../screens/admin/VerificationAdminScreen';
 
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useAuth } from '../hooks/useAuth';
+import { COLORS } from '../constants';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -55,6 +61,8 @@ function ProfileStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="ProfileMain" component={ProfileScreen} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+      <Stack.Screen name="ExperienceVerification" component={ExperienceVerificationScreen} />
+      <Stack.Screen name="VerificationAdmin" component={VerificationAdminScreen} />
     </Stack.Navigator>
   );
 }
@@ -66,16 +74,61 @@ export default function MainTabs() {
 
   return (
     <Tab.Navigator
-      screenOptions={{
+      screenOptions={({ route }) => {
+        const focusedRoute = getFocusedRouteNameFromRoute(route);
+        const hideTabBar = ['Chat', 'ExperienceVerification', 'VerificationAdmin'].includes(focusedRoute || '');
+
+        return {
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: '#111',
-          borderTopColor: '#222',
-          height: 64,
+        tabBarShowLabel: true,
+        tabBarStyle: hideTabBar ? { display: 'none' } : {
+          position: 'absolute',
+          left: 14,
+          right: 14,
+          bottom: 14,
+          height: 72,
+          borderRadius: 28,
+          backgroundColor: 'rgba(16, 19, 29, 0.96)',
+          borderTopWidth: 0,
+          borderWidth: 1,
+          borderColor: COLORS.border,
+          paddingTop: 8,
+          paddingBottom: Platform.OS === 'ios' ? 18 : 10,
+          boxShadow: '0px 18px 38px rgba(0, 0, 0, 0.34)',
+          elevation: 18,
         },
-        tabBarActiveTintColor: '#6C63FF',
-        tabBarInactiveTintColor: '#777',
-      }}
+        tabBarItemStyle: {
+          borderRadius: 22,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '800',
+        },
+        tabBarActiveTintColor: COLORS.white,
+        tabBarInactiveTintColor: COLORS.lightGray,
+        tabBarBadgeStyle: {
+          backgroundColor: COLORS.secondary,
+          color: COLORS.white,
+          fontWeight: '900',
+        },
+        tabBarIcon: ({ color, focused, size }) => {
+          const iconSize = focused ? size + 3 : size + 1;
+          const icons: Record<string, keyof typeof Ionicons.glyphMap> = {
+            Swipe: isCompany ? 'people' : 'briefcase',
+            Jobs: 'albums',
+            Matches: 'chatbubbles',
+            Profile: 'person-circle',
+          };
+
+          return (
+            <Ionicons
+              name={focused ? icons[route.name] : (`${icons[route.name]}-outline` as keyof typeof Ionicons.glyphMap)}
+              size={iconSize}
+              color={focused ? COLORS.primarySoft : color}
+            />
+          );
+        },
+      }}}
     >
         <Tab.Screen
         name="Swipe"

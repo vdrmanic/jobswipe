@@ -1,6 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../hooks/useAuth';
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
@@ -8,6 +9,7 @@ import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
 import CandidateSetupScreen from '../screens/setup/CandidateSetupScreen';
 import CompanySetupScreen from '../screens/setup/CompanySetupScreen';
 import MainTabs from './MainTabs';
+import { COLORS } from '../constants';
 
 const Stack = createNativeStackNavigator();
 
@@ -23,10 +25,27 @@ function AuthNavigator() {
 
 function LoadingScreen() {
   return (
-    <View style={{ flex: 1, backgroundColor: '#0a0a0a', justifyContent: 'center', alignItems: 'center' }}>
-      <ActivityIndicator size="large" color="#6C63FF" />
-      <Text style={{ color: '#888', marginTop: 12 }}>Učitavanje...</Text>
-    </View>
+    <LinearGradient
+      colors={[COLORS.dark, '#10131D', '#18102B']}
+      style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+    >
+      <View
+        style={{
+          width: 88,
+          height: 88,
+          borderRadius: 28,
+          backgroundColor: COLORS.glass,
+          borderWidth: 1,
+          borderColor: COLORS.border,
+          justifyContent: 'center',
+          alignItems: 'center',
+          marginBottom: 18,
+        }}
+      >
+        <ActivityIndicator size="large" color={COLORS.primarySoft} />
+      </View>
+      <Text style={{ color: COLORS.textMuted, fontWeight: '700' }}>Ucitavanje...</Text>
+    </LinearGradient>
   );
 }
 
@@ -34,29 +53,32 @@ function MissingProfileScreen() {
   const { signOut, refreshProfile } = useAuth();
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#0a0a0a', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-      <Text style={{ color: '#fff', fontSize: 22, fontWeight: 'bold', marginBottom: 12 }}>
-        Profil nije pronađen
+    <LinearGradient
+      colors={[COLORS.dark, '#111827', '#201335']}
+      style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}
+    >
+      <Text style={{ color: COLORS.white, fontSize: 24, fontWeight: '900', marginBottom: 12 }}>
+        Profil nije pronadjen
       </Text>
 
-      <Text style={{ color: '#888', textAlign: 'center', marginBottom: 24 }}>
-        Nalog postoji, ali profil nije pronađen u tabeli profiles.
+      <Text style={{ color: COLORS.textMuted, textAlign: 'center', marginBottom: 24, lineHeight: 22 }}>
+        Nalog postoji, ali profil nije pronadjen u tabeli profiles.
       </Text>
 
       <TouchableOpacity
         onPress={refreshProfile}
-        style={{ backgroundColor: '#6C63FF', padding: 16, borderRadius: 12, marginBottom: 12 }}
+        style={{ backgroundColor: COLORS.primary, padding: 16, borderRadius: 16, marginBottom: 12, minWidth: 190, alignItems: 'center' }}
       >
-        <Text style={{ color: '#fff', fontWeight: 'bold' }}>Pokušaj ponovo</Text>
+        <Text style={{ color: COLORS.white, fontWeight: '900' }}>Pokusaj ponovo</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
         onPress={signOut}
-        style={{ backgroundColor: '#222', padding: 16, borderRadius: 12 }}
+        style={{ backgroundColor: COLORS.glass, padding: 16, borderRadius: 16, minWidth: 190, alignItems: 'center', borderWidth: 1, borderColor: COLORS.border }}
       >
-        <Text style={{ color: '#fff', fontWeight: 'bold' }}>Odjavi se</Text>
+        <Text style={{ color: COLORS.white, fontWeight: '900' }}>Odjavi se</Text>
       </TouchableOpacity>
-    </View>
+    </LinearGradient>
   );
 }
 

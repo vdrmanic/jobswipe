@@ -2,67 +2,37 @@ import { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './useAuth';
+import { messageService } from '../services';
 
 export function useUnreadMessages() {
   const { user, profile } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
 
-  const fetchUnread = async () => {
+  const fetchUnread = useCallback(async () => {
     if (!user || !profile) {
       setUnreadCount(0);
       return;
     }
 
-    const column = profile.user_type === 'candidate' ? 'candidate_id' : 'company_id';
-
-    const { data: matches, error: matchesError } = await supabase
-      .from('matches')
-      .select('id')
-      .eq(column, user.id);
-
-    if (matchesError) {
-      console.log('UNREAD MATCHES ERROR:', matchesError);
+    try {
+      const count = await messageService.fetchUnreadCount(user.id, profile.user_type);
+      setUnreadCount(count);
+    } catch (error) {
+      console.log('UNREAD COUNT ERROR:', error);
       setUnreadCount(0);
-      return;
     }
-
-    const matchIds = matches?.map((m) => m.id) || [];
-
-    if (matchIds.length === 0) {
-      setUnreadCount(0);
-      return;
-    }
-
-    const { count, error: countError } = await supabase
-      .from('messages')
-      .select('*', { count: 'exact', head: true })
-      .in('match_id', matchIds)
-      .neq('sender_id', user.id)
-      .eq('read', false);
-
-    if (countError) {
-      console.log('UNREAD COUNT ERROR:', countError);
-      setUnreadCount(0);
-      return;
-    }
-
-    setUnreadCount(count || 0);
-  };
+  }, [user?.id, profile?.user_type]);
 
   useFocusEffect(
     useCallback(() => {
       fetchUnread();
-    }, [user?.id, profile?.user_type])
+    }, [fetchUnread])
   );
 
   useEffect(() => {
     if (!user || !profile) return;
 
     fetchUnread();
-
-    const interval = setInterval(() => {
-      fetchUnread();
-    }, 2000);
 
     const channel = supabase
       .channel(`unread-${user.id}`)
@@ -80,10 +50,9 @@ export function useUnreadMessages() {
       .subscribe();
 
     return () => {
-      clearInterval(interval);
       supabase.removeChannel(channel);
     };
-  }, [user?.id, profile?.user_type]);
+  }, [user?.id, profile?.user_type, fetchUnread]);
 
   return unreadCount;
 }

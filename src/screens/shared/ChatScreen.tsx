@@ -11,13 +11,18 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
+import { COLORS } from '../../constants';
 
 export default function ChatScreen({ route, navigation }: any) {
   const { match } = route.params;
   const { user } = useAuth();
   const isFocused = useIsFocused();
+  const insets = useSafeAreaInsets();
 
   const [messages, setMessages] = useState<any[]>([]);
   const [message, setMessage] = useState('');
@@ -67,21 +72,15 @@ export default function ChatScreen({ route, navigation }: any) {
     };
   }, [match.id]);
 
-
+  useEffect(() => {
+    if (isFocused) {
+      loadMessages();
+    }
+  }, [isFocused]);
 
   const openOtherProfile = () => {
-    const profileId =
-      match.candidate_id === user?.id ? match.company_id : match.candidate_id;
-
-    const userType =
-      match.candidate_id === user?.id ? 'company' : 'candidate';
-
-    console.log('OPEN PROFILE:', {
-      profileId,
-      userType,
-      match,
-      userId: user?.id,
-    });
+    const profileId = match.candidate_id === user?.id ? match.company_id : match.candidate_id;
+    const userType = match.candidate_id === user?.id ? 'company' : 'candidate';
 
     navigation.navigate('ViewProfile', {
       profileId,
@@ -117,7 +116,7 @@ export default function ChatScreen({ route, navigation }: any) {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#6C63FF" />
+        <ActivityIndicator size="large" color={COLORS.primarySoft} />
       </View>
     );
   }
@@ -127,13 +126,14 @@ export default function ChatScreen({ route, navigation }: any) {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <LinearGradient colors={[COLORS.dark, '#111827', COLORS.dark]} style={StyleSheet.absoluteFill} />
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backText}>‹ Nazad</Text>
+          <Ionicons name="chevron-back" size={22} color={COLORS.primarySoft} />
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={openOtherProfile} activeOpacity={0.7}>
-          <Text style={styles.header}>{match.otherName || 'Chat'}</Text>
+        <TouchableOpacity onPress={openOtherProfile} activeOpacity={0.75} style={styles.headerTitleWrap}>
+          <Text style={styles.header} numberOfLines={1}>{match.otherName || 'Chat'}</Text>
           <Text style={styles.profileHint}>Pogledaj profil</Text>
         </TouchableOpacity>
       </View>
@@ -153,17 +153,21 @@ export default function ChatScreen({ route, navigation }: any) {
         }}
       />
 
-      <View style={styles.inputRow}>
+      <View style={[styles.inputRow, { paddingBottom: Math.max(insets.bottom, 14) }]}>
         <TextInput
           value={message}
           onChangeText={setMessage}
-          placeholder="Pošalji poruku..."
-          placeholderTextColor="#777"
+          placeholder="Posalji poruku..."
+          placeholderTextColor={COLORS.lightGray}
           style={styles.input}
         />
 
         <TouchableOpacity style={styles.sendButton} onPress={sendMessage} disabled={sending}>
-          <Text style={styles.sendText}>{sending ? '...' : '➤'}</Text>
+          {sending ? (
+            <ActivityIndicator color={COLORS.white} />
+          ) : (
+            <Ionicons name="send" size={20} color={COLORS.white} />
+          )}
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -171,75 +175,93 @@ export default function ChatScreen({ route, navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0a' },
+  container: { flex: 1, backgroundColor: COLORS.dark },
   center: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: COLORS.dark,
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerRow: {
-    paddingTop: 55,
+    paddingTop: 54,
     paddingHorizontal: 16,
-    paddingBottom: 12,
-    borderBottomColor: '#222',
+    paddingBottom: 14,
+    borderBottomColor: COLORS.border,
     borderBottomWidth: 1,
+    backgroundColor: 'rgba(16, 19, 29, 0.88)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   backButton: {
-    marginBottom: 8,
+    width: 42,
+    height: 42,
+    borderRadius: 16,
+    backgroundColor: COLORS.glass,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  backText: {
-    color: '#6C63FF',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
+  headerTitleWrap: { flex: 1 },
   header: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
+    color: COLORS.white,
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 28,
   },
   profileHint: {
-    color: '#777',
-    marginTop: 3,
-    fontSize: 13,
+    color: COLORS.textMuted,
+    marginTop: 2,
+    fontSize: 12,
+    fontWeight: '800',
   },
-  messages: { padding: 16 },
+  messages: { padding: 18, paddingBottom: 16 },
   message: {
-    padding: 12,
-    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 22,
     marginBottom: 10,
-    maxWidth: '80%',
+    maxWidth: '78%',
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   myMessage: {
     alignSelf: 'flex-end',
-    backgroundColor: '#6C63FF',
+    backgroundColor: COLORS.primary,
+    borderBottomRightRadius: 8,
   },
   otherMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: '#1c1c1c',
+    backgroundColor: COLORS.cardRaised,
+    borderBottomLeftRadius: 8,
   },
-  messageText: { color: '#fff', fontSize: 15 },
+  messageText: { color: COLORS.white, fontSize: 15, lineHeight: 22 },
   inputRow: {
     flexDirection: 'row',
-    padding: 12,
-    borderTopColor: '#222',
+    padding: 14,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 14,
+    borderTopColor: COLORS.border,
     borderTopWidth: 1,
+    backgroundColor: 'rgba(7, 8, 13, 0.96)',
   },
   input: {
     flex: 1,
-    backgroundColor: '#151515',
-    color: '#fff',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    marginRight: 10,
+    backgroundColor: COLORS.input,
+    color: COLORS.white,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    marginRight: 12,
+    minHeight: 52,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   sendButton: {
-    backgroundColor: '#6C63FF',
-    width: 50,
-    height: 50,
-    borderRadius: 12,
+    backgroundColor: COLORS.primary,
+    width: 52,
+    height: 52,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  sendText: { color: '#fff', fontWeight: 'bold', fontSize: 18 },
 });

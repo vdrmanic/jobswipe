@@ -6,6 +6,7 @@ import {
   Image,
   Linking,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +16,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
+import PositionPicker from '../../components/PositionPicker';
 
 interface PlaceSuggestion {
   display_name: string;
@@ -122,6 +124,14 @@ export default function CreateJobScreen({ navigation }: any) {
       return;
     }
 
+    if (Platform.OS === 'web') {
+      setPlaceSuggestions([]);
+      setSelectedPlace(null);
+      setSuggestionsLoading(false);
+      setSuggestionsError(null);
+      return;
+    }
+
     setSuggestionsLoading(true);
     setSuggestionsError(null);
 
@@ -136,6 +146,11 @@ export default function CreateJobScreen({ navigation }: any) {
           },
         }
       );
+      if (!response.ok) {
+        setPlaceSuggestions([]);
+        setSuggestionsError(null);
+        return;
+      }
       const data = await response.json();
 
       if (Array.isArray(data)) {
@@ -362,12 +377,10 @@ export default function CreateJobScreen({ navigation }: any) {
       <Text style={styles.title}>Novi oglas 💼</Text>
       <Text style={styles.subtitle}>Dodaj posao koji će kandidati moći da swajpuju.</Text>
 
-      <TextInput
-        style={styles.input}
+      <PositionPicker
         placeholder="Naziv pozicije *"
-        placeholderTextColor="#999"
         value={title}
-        onChangeText={setTitle}
+        onChange={setTitle}
       />
 
       <TextInput

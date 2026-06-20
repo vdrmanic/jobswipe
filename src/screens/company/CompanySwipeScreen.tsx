@@ -8,17 +8,26 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
   Animated,
   Easing,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import SwipeCard from '../../components/SwipeCard';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
+import { findExperienceVerification, verificationService } from '../../services/verificationService';
+import { ExperienceItem, ExperienceVerification } from '../../types';
 
 export default function CompanySwipeScreen({ navigation }: any) {
   const { user, profile } = useAuth();
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const actionButtonSize = Math.min(Math.max(width * 0.13, 58), 78);
+  const actionButtonMargin = width > 420 ? 14 : 10;
 
   const [candidates, setCandidates] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -171,7 +180,18 @@ export default function CompanySwipeScreen({ navigation }: any) {
       return;
     }
 
-    setCandidates(data || []);
+    const candidateRows = data || [];
+    const candidateIds = candidateRows.map((candidate) => candidate.id);
+    let verificationRows: ExperienceVerification[] = [];
+
+    if (candidateIds.length > 0) {
+      verificationRows = await verificationService.fetchPublicVerifiedExperiences(candidateIds).catch(() => []);
+    }
+
+    setCandidates(candidateRows.map((candidate) => ({
+      ...candidate,
+      experience_verifications: verificationRows.filter((item) => item.candidate_id === candidate.id),
+    })));
     setCurrentIndex(0);
     setLoading(false);
   };
@@ -332,7 +352,7 @@ export default function CompanySwipeScreen({ navigation }: any) {
   const candidateProfile = currentCandidate.candidate_profiles;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: insets.bottom + 28 }] }>
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.header}>Kandidati</Text>
@@ -375,7 +395,7 @@ export default function CompanySwipeScreen({ navigation }: any) {
                   </Text>
                 )}
                 {/* decorative accent bar for premium feel */}
-                <View pointerEvents="none" style={styles.overlayAccent} />
+                <View style={[styles.overlayAccent, { pointerEvents: 'none' }]} />
               </View>
           </TouchableOpacity>
         </View>
@@ -416,15 +436,35 @@ export default function CompanySwipeScreen({ navigation }: any) {
             {!!currentCandidate?.candidate_profiles?.experience_items?.length && (
               <View style={styles.profileExperienceSection}>
                 <Text style={styles.profileSectionTitle}>Iskustvo</Text>
-                {currentCandidate.candidate_profiles.experience_items.slice(0, 2).map((item: any, idx: number) => (
-                  <View key={idx} style={styles.profileExperienceCard}>
-                    <View style={styles.profileExperienceHeader}>
-                      <Text style={styles.profileExperienceTitle}>{item.position}</Text>
-                      <Text style={styles.profileExperienceDuration}>{item.duration}</Text>
+                {currentCandidate.candidate_profiles.experience_items.slice(0, 2).map((item: ExperienceItem, idx: number) => {
+                  const verification = findExperienceVerification(
+                    currentCandidate.experience_verifications || [],
+                    item,
+                    idx
+                  );
+                  return (
+                    <View key={idx} style={styles.profileExperienceCard}>
+                      <View style={styles.profileExperienceHeader}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.profileExperienceTitle}>{item.position}</Text>
+                          {!!item.company && <Text style={styles.profileExperienceCompany}>{item.company}</Text>}
+                        </View>
+                        {verification?.status === 'verified' ? (
+                          <View style={styles.profileVerifiedBadge}>
+                            <Ionicons name="shield-checkmark" size={13} color="#6ee7b7" />
+                            <Text style={styles.profileVerifiedText}>Verifikovano</Text>
+                          </View>
+                        ) : (
+                          <Text style={styles.profileExperienceDuration}>{item.duration}</Text>
+                        )}
+                      </View>
+                      {verification?.status === 'verified' && (
+                        <Text style={styles.profileExperienceDuration}>{item.duration}</Text>
+                      )}
+                      {!!item.description && <Text style={styles.profileExperienceText}>{item.description}</Text>}
                     </View>
-                    {!!item.description && <Text style={styles.profileExperienceText}>{item.description}</Text>}
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             )}
 
@@ -441,15 +481,45 @@ export default function CompanySwipeScreen({ navigation }: any) {
       </Modal>
 
       {/* Action buttons moved outside card to avoid overlapping overlay/content */}
-      <View style={[styles.actionsOverlay, { pointerEvents: 'box-none' }] }>
-        <TouchableOpacity style={[styles.actionButton, styles.actionButtonLeft]} onPress={() => handleSwipe('left')}>
-          <Text style={styles.actionEmoji}>✕</Text>
+      <View
+        style={[
+          styles.actionsOverlay,
+          {
+            pointerEvents: 'box-none',
+            bottom: insets.bottom + 18,
+            paddingHorizontal: width > 420 ? 24 : 16,
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={[
+            styles.actionButton,
+            styles.actionButtonLeft,
+            { width: actionButtonSize, height: actionButtonSize, borderRadius: actionButtonSize / 2, marginHorizontal: actionButtonMargin },
+          ]}
+          onPress={() => handleSwipe('left')}
+        >
+          <Ionicons name="close" size={30} color="#ff7a86" />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionButton, styles.actionButtonCenter]} onPress={openCandidateProfile}>
-          <Text style={styles.actionEmoji}>ℹ️</Text>
+        <TouchableOpacity
+          style={[
+            styles.actionButton,
+            styles.actionButtonCenter,
+            { width: actionButtonSize, height: actionButtonSize, borderRadius: actionButtonSize / 2, marginHorizontal: actionButtonMargin },
+          ]}
+          onPress={openCandidateProfile}
+        >
+          <Ionicons name="information" size={28} color="#7DE7FF" />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionButton, styles.actionButtonRight]} onPress={() => handleSwipe('right')}>
-          <Text style={styles.actionEmoji}>♥</Text>
+        <TouchableOpacity
+          style={[
+            styles.actionButton,
+            styles.actionButtonRight,
+            { width: actionButtonSize, height: actionButtonSize, borderRadius: actionButtonSize / 2, marginHorizontal: actionButtonMargin },
+          ]}
+          onPress={() => handleSwipe('right')}
+        >
+          <Ionicons name="heart" size={30} color="#FF7AC8" />
         </TouchableOpacity>
       </View>
 
@@ -557,39 +627,71 @@ const styles = StyleSheet.create({
     backgroundColor: '#090909',
     paddingTop: 12,
     paddingHorizontal: 20,
+    paddingBottom: 24,
     alignItems: 'center',
   },
   headerRow: {
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
     marginBottom: 16,
   },
-  header: { color: '#fff', fontSize: 32, fontWeight: '900', marginBottom: 0 },
-  subHeader: { color: '#6C63FF', marginTop: 4, fontSize: 14, maxWidth: '72%', fontWeight: '600' },
+  header: {
+    color: '#fff',
+    fontSize: 30,
+    fontWeight: '900',
+    lineHeight: 38,
+    marginBottom: 0,
+  },
+  subHeader: {
+    color: '#a9b3ff',
+    marginTop: 4,
+    fontSize: 14,
+    maxWidth: '72%',
+    fontWeight: '600',
+  },
   countPill: {
-    backgroundColor: '#111',
+    backgroundColor: '#141623',
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: '#6C63FF',
-    boxShadow: '0px 0px 12px rgba(108, 99, 255, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(108, 99, 255, 0.18)',
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 12px 24px rgba(46, 52, 112, 0.16)',
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOpacity: 0.14,
+        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 8 },
+      },
+    }),
   },
-  countText: { color: '#6C63FF', fontWeight: '700' },
+  countText: { color: '#8f9bff', fontWeight: '700' },
   center: { flex: 1, backgroundColor: '#090909', justifyContent: 'center', alignItems: 'center' },
   card: {
+    flex: 1,
     width: '100%',
-    maxWidth: 420,
-    height: 600,
-    backgroundColor: '#0d0d0d',
+    backgroundColor: '#0e1220',
     borderRadius: 34,
     overflow: 'hidden',
     justifyContent: 'flex-end',
-    borderWidth: 2,
-    borderColor: 'rgba(108, 99, 255, 0.3)',
-    boxShadow: '0px 0px 24px rgba(108, 99, 255, 0.2)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(108, 99, 255, 0.18)',
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 18px 36px rgba(0, 0, 0, 0.22)',
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOpacity: 0.18,
+        shadowRadius: 20,
+        shadowOffset: { width: 0, height: 12 },
+      },
+    }),
   },
   cardTouch: {
     flex: 1,
@@ -692,34 +794,38 @@ const styles = StyleSheet.create({
   refreshButtonText: { color: '#fff', fontWeight: 'bold' },
   actionsOverlay: {
     position: 'absolute',
-    bottom: 16,
-    left: 16,
-    right: 16,
+    bottom: 10,
+    width: '100%',
+    paddingBottom: 12,
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-evenly',
     alignItems: 'center',
   },
   actionButton: {
-    width: 60,
-    height: 60,
+    width: 62,
+    height: 62,
     borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2.5,
-    borderColor: '#222',
-    backgroundColor: 'rgba(15,15,20,0.95)',
-    shadowColor: '#000',
-    shadowOpacity: 0.6,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-    boxShadow: '0px 8px 20px rgba(0, 0, 0, 0.6)',
+    borderWidth: 1.5,
+    borderColor: '#262a38',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    boxShadow: '0px 10px 22px rgba(0, 0, 0, 0.18)',
+    ...Platform.select({
+      default: {
+        shadowColor: '#000',
+        shadowOpacity: 0.2,
+        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 10 },
+      },
+    }),
     marginHorizontal: 10,
-    elevation: 12,
+    elevation: 10,
   },
   actionButtonLeft: {
-    borderColor: '#FF3B47',
-    backgroundColor: 'rgba(255, 59, 71, 0.2)',
-    boxShadow: '0px 0px 20px rgba(255, 59, 71, 0.25)',
+    borderColor: '#ff6c75',
+    backgroundColor: 'rgba(255, 59, 71, 0.14)',
+    boxShadow: '0px 0px 16px rgba(255, 59, 71, 0.18)',
   },
   actionButtonCenter: {
     borderColor: '#00D9FF',
@@ -781,10 +887,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
     marginBottom: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
+    boxShadow: '0px 12px 28px rgba(0, 0, 0, 0.22)',
+    ...Platform.select({
+      default: {
+        shadowColor: '#000',
+        shadowOpacity: 0.35,
+        shadowRadius: 18,
+        shadowOffset: { width: 0, height: 10 },
+      },
+    }),
     elevation: 12,
   },
   matchAvatar: {
@@ -811,9 +922,16 @@ const styles = StyleSheet.create({
   matchHandshake: {
     fontSize: 56,
     marginHorizontal: 18,
-    textShadowColor: 'rgba(255,255,255,0.22)',
-    textShadowOffset: { width: 0, height: 8 },
-    textShadowRadius: 20,
+    ...Platform.select({
+      web: {
+        textShadow: '0px 8px 20px rgba(255,255,255,0.22)',
+      },
+      default: {
+        textShadowColor: 'rgba(255,255,255,0.22)',
+        textShadowOffset: { width: 0, height: 8 },
+        textShadowRadius: 20,
+      },
+    }),
   },
   matchCard: {
     backgroundColor: '#111',
@@ -823,10 +941,17 @@ const styles = StyleSheet.create({
     minWidth: 300,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
-    shadowColor: '#000',
-    shadowOpacity: 0.28,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 12 },
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 0px 20px rgba(0, 0, 0, 0.24)',
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOpacity: 0.28,
+        shadowRadius: 20,
+        shadowOffset: { width: 0, height: 12 },
+      },
+    }),
     elevation: 14,
   },
   profileModalOverlay: {
@@ -940,6 +1065,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     flex: 1,
     marginRight: 10,
+  },
+  profileExperienceCompany: {
+    color: '#d8d8e5',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 3,
+  },
+  profileVerifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(52, 211, 153, 0.12)',
+    borderColor: 'rgba(52, 211, 153, 0.38)',
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  profileVerifiedText: {
+    color: '#6ee7b7',
+    fontSize: 9,
+    fontWeight: '900',
   },
   profileExperienceDuration: {
     color: '#6C63FF',

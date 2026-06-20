@@ -14,12 +14,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
-
-type ExperienceItem = {
-  position: string;
-  duration: string;
-  description: string;
-};
+import { ExperienceItem } from '../../types';
+import PositionPicker from '../../components/PositionPicker';
 
 export default function EditProfileScreen({ navigation }: any) {
   const { user, profile, refreshProfile } = useAuth();
@@ -43,6 +39,7 @@ export default function EditProfileScreen({ navigation }: any) {
   const [companySize, setCompanySize] = useState('');
   const [website, setWebsite] = useState('');
 
+  const [expCompany, setExpCompany] = useState('');
   const [expPosition, setExpPosition] = useState('');
   const [expDuration, setExpDuration] = useState('');
   const [expDescription, setExpDescription] = useState('');
@@ -86,7 +83,7 @@ export default function EditProfileScreen({ navigation }: any) {
   );
 
   const addExperience = () => {
-    if (!expPosition.trim() || !expDuration.trim()) {
+    if (!expCompany.trim() || !expPosition.trim() || !expDuration.trim()) {
       Alert.alert('Greška', 'Unesi poziciju i trajanje iskustva');
       return;
     }
@@ -94,12 +91,14 @@ export default function EditProfileScreen({ navigation }: any) {
     setExperienceItems([
       ...experienceItems,
       {
+        company: expCompany.trim(),
         position: expPosition.trim(),
         duration: expDuration.trim(),
         description: expDescription.trim(),
       },
     ]);
 
+    setExpCompany('');
     setExpPosition('');
     setExpDuration('');
     setExpDescription('');
@@ -339,12 +338,10 @@ const pickAndUploadImage = async () => {
         <>
           <Text style={styles.sectionTitle}>Podaci kandidata</Text>
 
-          <TextInput
-            style={styles.input}
+          <PositionPicker
             placeholder="Pozicija koju tražiš, opciono"
-            placeholderTextColor="#999"
             value={position}
-            onChangeText={setPosition}
+            onChange={setPosition}
           />
 
           <TextInput
@@ -359,6 +356,7 @@ const pickAndUploadImage = async () => {
 
           {experienceItems.map((item, index) => (
             <View key={index} style={styles.expCard}>
+              {!!item.company && <Text style={styles.expCompany}>{item.company}</Text>}
               <Text style={styles.expTitle}>{item.position}</Text>
               <Text style={styles.expDuration}>{item.duration}</Text>
               {!!item.description && <Text style={styles.expDesc}>{item.description}</Text>}
@@ -371,10 +369,16 @@ const pickAndUploadImage = async () => {
 
           <TextInput
             style={styles.input}
-            placeholder="Pozicija iskustva"
+            placeholder="Firma u kojoj si radio"
             placeholderTextColor="#999"
+            value={expCompany}
+            onChangeText={setExpCompany}
+          />
+
+          <PositionPicker
+            placeholder="Pozicija iskustva"
             value={expPosition}
-            onChangeText={setExpPosition}
+            onChange={setExpPosition}
           />
 
           <TextInput
@@ -488,6 +492,7 @@ imageButtonText: {
   fontWeight: 'bold',
 },
   expTitle: { color: '#fff', fontSize: 17, fontWeight: 'bold' },
+  expCompany: { color: '#a8b2ff', fontSize: 13, fontWeight: '800', marginBottom: 4 },
   expDuration: { color: '#6C63FF', marginTop: 4 },
   expDesc: { color: '#aaa', marginTop: 8, lineHeight: 20 },
   removeText: { color: '#ff5c5c', fontWeight: 'bold', marginTop: 10 },

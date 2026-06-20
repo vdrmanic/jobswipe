@@ -1,186 +1,144 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
+  Platform,
   RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
+import { matchService } from '../../services';
+import { COLORS } from '../../constants';
+import { formatDateTime } from '../../utils/helpers';
 
 export default function MatchesScreen({ navigation }: any) {
   const { user, profile } = useAuth();
+  const { width } = useWindowDimensions();
 
   const [matches, setMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchMatches = async () => {
+  const fetchMatches = useCallback(async () => {
     if (!user || !profile) {
       setLoading(false);
       setRefreshing(false);
       return;
     }
 
-    setLoading(true);
+    try {
+      setLoading(true);
+      const matchesData = await matchService.fetchMatches(user.id, profile.user_type);
+      const matchIds = matchesData.map((m) => m.id);
+      let unreadMap: Record<string, number> = {};
 
-    const column = profile.user_type === 'candidate' ? 'candidate_id' : 'company_id';
+      if (matchIds.length > 0) {
+        const { data: unreadMessages } = await supabase
+          .from('messages')
+          .select('match_id')
+          .in('match_id', matchIds)
+          .neq('sender_id', user.id)
+          .eq('read', false);
 
-    const { data, error } = await supabase
-      .from('matches')
-      .select('*')
-      .eq(column, user.id)
-      .order('created_at', { ascending: false });
+        unreadMap = (unreadMessages || []).reduce((acc: any, msg: any) => {
+          acc[msg.match_id] = (acc[msg.match_id] || 0) + 1;
+          return acc;
+        }, {});
+      }
 
-    if (error) {
+      const prepared = matchesData.map((match: any) => {
+        const isCandidate = profile.user_type === 'candidate';
+        const otherProfile = isCandidate ? match.company_profiles : match.profiles;
+        const jobData = match.job_listings;
+
+        return {
+          ...match,
+          otherName: otherProfile?.company_name || otherProfile?.full_name || 'Kontakt',
+          otherMeta: otherProfile?.industry || otherProfile?.location || '',
+          jobTitle: jobData?.title || 'Oglas',
+          jobLocation: jobData?.location || '',
+          unreadCount: unreadMap[match.id] || 0,
+        };
+      });
+
+      setMatches(prepared);
+      setLoading(false);
+      setRefreshing(false);
+    } catch (error) {
       console.log('MATCHES ERROR:', error);
+      Alert.alert('Greska', 'Nije moguce ucitati meceve');
       setMatches([]);
       setLoading(false);
       setRefreshing(false);
-      return;
     }
-
-    let prepared = data || [];
-
-    const jobIds = [...new Set(prepared.map((m) => m.job_id).filter(Boolean))];
-    const matchIds = prepared.map((m) => m.id);
-
-    let jobMap: any = {};
-    let unreadMap: any = {};
-
-    if (jobIds.length > 0) {
-      const { data: jobs } = await supabase
-        .from('job_listings')
-        .select('id, title, location')
-        .in('id', jobIds);
-
-      jobMap = (jobs || []).reduce((acc: any, job: any) => {
-        acc[job.id] = job;
-        return acc;
-      }, {});
-    }
-
-    if (matchIds.length > 0) {
-      const { data: unreadMessages } = await supabase
-        .from('messages')
-        .select('match_id')
-        .in('match_id', matchIds)
-        .neq('sender_id', user.id)
-        .eq('read', false);
-
-      unreadMap = (unreadMessages || []).reduce((acc: any, msg: any) => {
-        acc[msg.match_id] = (acc[msg.match_id] || 0) + 1;
-        return acc;
-      }, {});
-    }
-
-    if (profile.user_type === 'candidate') {
-      const companyIds = [...new Set(prepared.map((m) => m.company_id).filter(Boolean))];
-
-      let companyMap: any = {};
-
-      if (companyIds.length > 0) {
-        const { data: companies } = await supabase
-          .from('company_profiles')
-          .select('id, company_name, industry')
-          .in('id', companyIds);
-
-        companyMap = (companies || []).reduce((acc: any, company: any) => {
-          acc[company.id] = company;
-          return acc;
-        }, {});
-      }
-
-      prepared = prepared.map((m) => ({
-        ...m,
-        otherName: companyMap[m.company_id]?.company_name || 'Firma',
-        otherMeta: companyMap[m.company_id]?.industry || '',
-        jobTitle: jobMap[m.job_id]?.title || 'Oglas',
-        jobLocation: jobMap[m.job_id]?.location || '',
-        unreadCount: unreadMap[m.id] || 0,
-      }));
-    } else {
-      const candidateIds = [...new Set(prepared.map((m) => m.candidate_id).filter(Boolean))];
-
-      let candidateMap: any = {};
-
-      if (candidateIds.length > 0) {
-        const { data: candidates } = await supabase
-          .from('profiles')
-          .select('id, full_name, location')
-          .in('id', candidateIds);
-
-        candidateMap = (candidates || []).reduce((acc: any, candidate: any) => {
-          acc[candidate.id] = candidate;
-          return acc;
-        }, {});
-      }
-
-      prepared = prepared.map((m) => ({
-        ...m,
-        otherName: candidateMap[m.candidate_id]?.full_name || 'Kandidat',
-        otherMeta: candidateMap[m.candidate_id]?.location || '',
-        jobTitle: jobMap[m.job_id]?.title || 'Oglas',
-        jobLocation: jobMap[m.job_id]?.location || '',
-        unreadCount: unreadMap[m.id] || 0,
-      }));
-    }
-
-    setMatches(prepared);
-    setLoading(false);
-    setRefreshing(false);
-  };
+  }, [user?.id, profile?.user_type]);
 
   useFocusEffect(
     useCallback(() => {
       fetchMatches();
-    }, [user?.id, profile?.user_type])
+    }, [fetchMatches])
   );
 
-useEffect(() => {
-  if (!user || !profile) return;
+  useEffect(() => {
+    if (!user || !profile) return;
 
-  const channel = supabase
-    .channel(`matches-list-${user.id}`)
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'messages',
-      },
-      () => {
-        fetchMatches();
-      }
-    )
-    .subscribe();
+    const channel = supabase
+      .channel(`matches-list-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messages',
+        },
+        () => {
+          fetchMatches();
+        }
+      )
+      .subscribe();
 
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, [user?.id, profile?.user_type]);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, profile?.user_type, fetchMatches]);
 
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#6C63FF" />
+        <ActivityIndicator size="large" color={COLORS.primarySoft} />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Mečevi 💬</Text>
-      <Text style={styles.subtitle}>Ljudi i firme koje su se međusobno lajkovali.</Text>
+      <LinearGradient colors={[COLORS.dark, '#111827', COLORS.dark]} style={StyleSheet.absoluteFill} />
+      <View style={styles.hero}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.header}>Mecevi</Text>
+          <Text style={styles.subtitle}>Konverzacije gde su obe strane rekle da.</Text>
+        </View>
+        <View style={styles.heroIcon}>
+          <Ionicons name="chatbubbles" size={26} color={COLORS.primarySoft} />
+        </View>
+      </View>
 
       <FlatList
         data={matches}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[
+          styles.list,
+          { paddingHorizontal: width > 760 ? (width - 760) / 2 : 20 },
+        ]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -188,28 +146,33 @@ useEffect(() => {
               setRefreshing(true);
               fetchMatches();
             }}
+            tintColor={COLORS.primary}
           />
         }
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>Još nema mečeva</Text>
+            <View style={styles.emptyIcon}>
+              <Ionicons name="sparkles" size={28} color={COLORS.primarySoft} />
+            </View>
+            <Text style={styles.emptyTitle}>Jos nema meceva</Text>
             <Text style={styles.emptyText}>
-              Kada obe strane kliknu “Sviđa mi se”, pojaviće se ovde.
+              Kad obe strane kliknu "Svidja mi se", pojavice se ovde.
             </Text>
           </View>
         }
         renderItem={({ item }) => (
           <TouchableOpacity
-            style={[
-              styles.card,
-              item.unreadCount > 0 && styles.unreadCard,
-            ]}
+            style={[styles.card, item.unreadCount > 0 && styles.unreadCard]}
             onPress={() => navigation.navigate('Chat', { match: item })}
+            activeOpacity={0.86}
           >
             <View style={styles.cardTop}>
+              <View style={styles.avatarBubble}>
+                <Ionicons name="person" size={18} color={COLORS.primarySoft} />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.otherName}</Text>
-                {!!item.otherMeta && <Text style={styles.meta}>📍 {item.otherMeta}</Text>}
+                {!!item.otherMeta && <Text style={styles.meta}>{item.otherMeta}</Text>}
               </View>
 
               {item.unreadCount > 0 && (
@@ -219,16 +182,17 @@ useEffect(() => {
               )}
             </View>
 
-            <Text style={styles.jobTitle}>💼 {item.jobTitle}</Text>
+            <View style={styles.jobPill}>
+              <Ionicons name="briefcase" size={15} color={COLORS.accent} />
+              <Text style={styles.jobTitle}>{item.jobTitle}</Text>
+            </View>
 
-            {!!item.jobLocation && (
-              <Text style={styles.meta}>Lokacija posla: {item.jobLocation}</Text>
-            )}
+            {!!item.jobLocation && <Text style={styles.meta}>Lokacija posla: {item.jobLocation}</Text>}
 
             {item.unreadCount > 0 ? (
-              <Text style={styles.unreadText}>Nova poruka</Text>
+              <Text style={styles.unreadText}>Nova poruka ceka odgovor</Text>
             ) : (
-              <Text style={styles.matchDate}>Nema novih poruka</Text>
+              <Text style={styles.matchDate}>Nema novih poruka - {formatDateTime(item.created_at)}</Text>
             )}
           </TouchableOpacity>
         )}
@@ -238,79 +202,138 @@ useEffect(() => {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0a' },
+  container: { flex: 1, backgroundColor: COLORS.dark },
   center: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: COLORS.dark,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  header: {
-    color: '#fff',
-    fontSize: 30,
-    fontWeight: 'bold',
-    paddingTop: 60,
+  hero: {
+    paddingTop: 58,
     paddingHorizontal: 24,
+    paddingBottom: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  heroIcon: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: COLORS.glass,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  header: {
+    color: COLORS.white,
+    fontSize: 34,
+    fontWeight: '900',
+    lineHeight: 40,
   },
   subtitle: {
-    color: '#888',
-    paddingHorizontal: 24,
+    color: COLORS.textMuted,
     marginTop: 6,
-    marginBottom: 20,
+    fontSize: 14,
+    lineHeight: 21,
   },
-  list: { paddingHorizontal: 24, paddingBottom: 100 },
-  empty: { alignItems: 'center', marginTop: 100 },
-  emptyTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
+  list: { paddingBottom: 118 },
+  empty: { alignItems: 'center', marginTop: 86, paddingHorizontal: 24 },
+  emptyIcon: {
+    width: 68,
+    height: 68,
+    borderRadius: 24,
+    backgroundColor: COLORS.glass,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: { color: COLORS.white, fontSize: 22, fontWeight: '900' },
   emptyText: {
-    color: '#888',
+    color: COLORS.textMuted,
     textAlign: 'center',
     marginTop: 8,
-    lineHeight: 20,
+    lineHeight: 22,
   },
   card: {
-    backgroundColor: '#151515',
-    borderColor: '#333',
+    backgroundColor: 'rgba(16, 19, 29, 0.92)',
+    borderColor: COLORS.border,
     borderWidth: 1,
-    borderRadius: 16,
+    borderRadius: 26,
     padding: 18,
     marginBottom: 14,
+    boxShadow: '0px 18px 40px rgba(0, 0, 0, 0.20)',
+    ...Platform.select({
+      default: {
+        shadowColor: '#000',
+        shadowOpacity: 0.14,
+        shadowRadius: 18,
+        shadowOffset: { width: 0, height: 10 },
+      },
+    }),
   },
   unreadCard: {
-    borderColor: '#6C63FF',
-    backgroundColor: '#17142a',
+    borderColor: COLORS.primary,
+    backgroundColor: 'rgba(124, 92, 255, 0.18)',
   },
   cardTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 14,
+    gap: 12,
   },
-  name: { color: '#fff', fontSize: 22, fontWeight: 'bold', marginBottom: 6 },
-  meta: { color: '#aaa', marginBottom: 6 },
+  avatarBubble: {
+    width: 42,
+    height: 42,
+    borderRadius: 16,
+    backgroundColor: COLORS.glassStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  name: { color: COLORS.white, fontSize: 20, fontWeight: '900', marginBottom: 3 },
+  meta: { color: COLORS.textMuted, marginTop: 5, fontSize: 13, lineHeight: 18 },
+  jobPill: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(54, 209, 220, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(54, 209, 220, 0.28)',
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: 2,
+    marginBottom: 8,
+  },
   jobTitle: {
-    color: '#6C63FF',
-    fontWeight: 'bold',
-    marginTop: 8,
-    marginBottom: 6,
+    color: COLORS.text,
+    fontWeight: '800',
+    fontSize: 14,
   },
-  matchDate: { color: '#666', marginTop: 10, fontSize: 12 },
+  matchDate: { color: '#7F89A8', marginTop: 10, fontSize: 12, lineHeight: 18 },
   unreadText: {
-    color: '#4ade80',
+    color: COLORS.mint,
     marginTop: 10,
     fontSize: 13,
-    fontWeight: 'bold',
+    fontWeight: '900',
   },
   badge: {
-    backgroundColor: '#6C63FF',
-    minWidth: 26,
-    height: 26,
-    borderRadius: 13,
+    backgroundColor: COLORS.secondary,
+    minWidth: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 12,
   },
   badgeText: {
-    color: '#fff',
-    fontWeight: 'bold',
+    color: COLORS.white,
+    fontWeight: '900',
     fontSize: 13,
   },
 });

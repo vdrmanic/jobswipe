@@ -12,12 +12,8 @@ import {
 } from 'react-native';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
-
-type ExperienceItem = {
-  position: string;
-  duration: string;
-  description: string;
-};
+import { ExperienceItem } from '../../types';
+import PositionPicker from '../../components/PositionPicker';
 
 const skillCategories = [
   {
@@ -57,6 +53,7 @@ export default function CandidateSetupScreen() {
   const [location, setLocation] = useState('');
   const [bio, setBio] = useState('');
 
+  const [expCompany, setExpCompany] = useState('');
   const [expPosition, setExpPosition] = useState('');
   const [expDuration, setExpDuration] = useState('');
   const [expDescription, setExpDescription] = useState('');
@@ -65,7 +62,7 @@ export default function CandidateSetupScreen() {
   const [loading, setLoading] = useState(false);
 
   const addExperience = () => {
-    if (!expPosition.trim() || !expDuration.trim()) {
+    if (!expCompany.trim() || !expPosition.trim() || !expDuration.trim()) {
       Alert.alert('Greška', 'Unesi poziciju i trajanje iskustva');
       return;
     }
@@ -73,12 +70,14 @@ export default function CandidateSetupScreen() {
     setExperienceItems([
       ...experienceItems,
       {
+        company: expCompany.trim(),
         position: expPosition.trim(),
         duration: expDuration.trim(),
         description: expDescription.trim(),
       },
     ]);
 
+    setExpCompany('');
     setExpPosition('');
     setExpDuration('');
     setExpDescription('');
@@ -152,12 +151,10 @@ export default function CandidateSetupScreen() {
         onChangeText={setLocation}
       />
 
-      <TextInput
-        style={styles.input}
+      <PositionPicker
         placeholder="Pozicija koju tražiš, opciono"
-        placeholderTextColor="#999"
         value={position}
-        onChangeText={setPosition}
+        onChange={setPosition}
       />
 
       <Text style={styles.sectionTitle}>Veštine</Text>
@@ -253,6 +250,7 @@ export default function CandidateSetupScreen() {
 
       {experienceItems.map((item, index) => (
         <View key={index} style={styles.experienceCard}>
+          {!!item.company && <Text style={styles.experienceCompany}>{item.company}</Text>}
           <Text style={styles.experienceTitle}>{item.position}</Text>
           <Text style={styles.experienceDuration}>{item.duration}</Text>
           {!!item.description && <Text style={styles.experienceDesc}>{item.description}</Text>}
@@ -265,10 +263,16 @@ export default function CandidateSetupScreen() {
 
       <TextInput
         style={styles.input}
-        placeholder="Pozicija na kojoj si radio"
+        placeholder="Firma u kojoj si radio"
         placeholderTextColor="#999"
+        value={expCompany}
+        onChangeText={setExpCompany}
+      />
+
+      <PositionPicker
+        placeholder="Pozicija na kojoj si radio"
         value={expPosition}
-        onChangeText={setExpPosition}
+        onChange={setExpPosition}
       />
 
       <TextInput
@@ -462,6 +466,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   experienceTitle: { color: '#fff', fontSize: 17, fontWeight: 'bold' },
+  experienceCompany: { color: '#a8b2ff', fontSize: 13, fontWeight: '800', marginBottom: 4 },
   experienceDuration: { color: '#6C63FF', marginTop: 4, marginBottom: 6 },
   experienceDesc: { color: '#aaa', marginBottom: 10 },
   removeText: { color: '#ff5c5c', fontWeight: 'bold' },

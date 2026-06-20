@@ -11,9 +11,36 @@ export interface Profile {
 }
 
 export interface ExperienceItem {
+  company?: string;
   position: string;
   duration: string;
   description?: string;
+}
+
+export type ExperienceVerificationStatus =
+  | 'pending'
+  | 'verified'
+  | 'rejected'
+  | 'changes_requested';
+
+export interface ExperienceVerification {
+  id: string;
+  candidate_id: string;
+  experience_index: number;
+  company_name: string;
+  position: string;
+  duration: string;
+  description: string;
+  document_path: string;
+  document_name: string;
+  document_mime_type: string;
+  status: ExperienceVerificationStatus;
+  review_note: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  profiles?: Pick<Profile, 'full_name' | 'avatar_url'>;
 }
 
 export interface CandidateProfile {

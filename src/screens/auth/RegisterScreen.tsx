@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,7 +12,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../hooks/useAuth';
+import { COLORS } from '../../constants';
 import { UserType } from '../../types';
 
 export default function RegisterScreen({ navigation }: any) {
@@ -28,159 +32,206 @@ export default function RegisterScreen({ navigation }: any) {
     const trimmedFullName = fullName.trim();
 
     if (!trimmedEmail || !trimmedPassword || !trimmedFullName) {
-      Alert.alert('Greška', 'Popunite sva polja');
+      Alert.alert('Greska', 'Popunite sva polja');
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(trimmedEmail)) {
-      Alert.alert('Greška', 'Unesi validan email');
+      Alert.alert('Greska', 'Unesi validan email');
       return;
     }
 
     if (trimmedPassword.length < 8) {
-      Alert.alert('Greška', 'Lozinka mora imati najmanje 8 karaktera');
+      Alert.alert('Greska', 'Lozinka mora imati najmanje 8 karaktera');
       return;
     }
 
     if (trimmedFullName.length < 3) {
-      Alert.alert('Greška', 'Unesi puno ime i prezime');
+      Alert.alert('Greska', 'Unesi puno ime i prezime');
       return;
     }
 
     setLoading(true);
-
     const { error } = await signUp(trimmedEmail, trimmedPassword, trimmedFullName, userType);
-
     setLoading(false);
 
     if (error) {
-      Alert.alert('Greška', error.message);
+      Alert.alert('Greska', error.message);
       return;
     }
 
-    Alert.alert(
-      'Uspeh',
-      'Nalog je kreiran. Ako je potrebna verifikacija, proveri inbox. Ako ne, prijavi se.'
-    );
-
+    Alert.alert('Uspeh', 'Nalog je kreiran. Ako je potrebna verifikacija, proveri inbox.');
     navigation.navigate('Login');
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Kreiraj nalog</Text>
-        <Text style={styles.subtitle}>Odaberi tip naloga</Text>
+    <LinearGradient colors={[COLORS.dark, '#10131D', '#16243B']} style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.keyboard}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
+          <Text style={styles.title}>Kreiraj nalog</Text>
+          <Text style={styles.subtitle}>Izaberi stranu trzista i napravi profil koji moze da matchuje.</Text>
 
-        <View style={styles.typeContainer}>
-          <TouchableOpacity
-            style={[styles.typeButton, userType === 'candidate' && styles.typeButtonActive]}
-            onPress={() => setUserType('candidate')}
-          >
-            <Text style={styles.typeEmoji}>👤</Text>
-            <Text style={[styles.typeText, userType === 'candidate' && styles.typeTextActive]}>
-              Tražim posao
+          <View style={styles.typeContainer}>
+            <TypeOption
+              active={userType === 'candidate'}
+              icon="person"
+              title="Kandidat"
+              subtitle="Trazim posao"
+              onPress={() => setUserType('candidate')}
+            />
+            <TypeOption
+              active={userType === 'company'}
+              icon="business"
+              title="Firma"
+              subtitle="Trazim radnike"
+              onPress={() => setUserType('company')}
+            />
+          </View>
+
+          <View style={styles.card}>
+            <Field icon="person-outline">
+              <TextInput
+                style={styles.input}
+                placeholder={userType === 'candidate' ? 'Ime i prezime' : 'Vase ime'}
+                placeholderTextColor={COLORS.lightGray}
+                value={fullName}
+                onChangeText={setFullName}
+              />
+            </Field>
+            <Field icon="mail-outline">
+              <TextInput
+                style={styles.input}
+                placeholder="Email"
+                placeholderTextColor={COLORS.lightGray}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </Field>
+            <Field icon="lock-closed-outline">
+              <TextInput
+                style={styles.input}
+                placeholder="Lozinka"
+                placeholderTextColor={COLORS.lightGray}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+              />
+            </Field>
+
+            <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
+              {loading ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.buttonText}>Registruj se</Text>}
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+            <Text style={styles.link}>
+              Vec imas nalog? <Text style={styles.linkBold}>Prijavi se</Text>
             </Text>
           </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </LinearGradient>
+  );
+}
 
-          <TouchableOpacity
-            style={[styles.typeButton, userType === 'company' && styles.typeButtonActive]}
-            onPress={() => setUserType('company')}
-          >
-            <Text style={styles.typeEmoji}>🏢</Text>
-            <Text style={[styles.typeText, userType === 'company' && styles.typeTextActive]}>
-              Tražim radnike
-            </Text>
-          </TouchableOpacity>
-        </View>
+function Field({ icon, children }: { icon: keyof typeof Ionicons.glyphMap; children: ReactNode }) {
+  return (
+    <View style={styles.field}>
+      <Ionicons name={icon} size={20} color={COLORS.textMuted} />
+      {children}
+    </View>
+  );
+}
 
-        <TextInput
-          style={styles.input}
-          placeholder={userType === 'candidate' ? 'Ime i prezime' : 'Vaše ime'}
-          placeholderTextColor="#999"
-          value={fullName}
-          onChangeText={setFullName}
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor="#999"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Lozinka"
-          placeholderTextColor="#999"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
-
-        <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Registruj se</Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-          <Text style={styles.link}>
-            Već imaš nalog? <Text style={styles.linkBold}>Prijavi se</Text>
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+function TypeOption({
+  active,
+  icon,
+  title,
+  subtitle,
+  onPress,
+}: {
+  active: boolean;
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity style={[styles.typeButton, active && styles.typeButtonActive]} onPress={onPress}>
+      <Ionicons name={icon} size={26} color={active ? COLORS.primarySoft : COLORS.textMuted} />
+      <Text style={[styles.typeTitle, active && styles.typeTextActive]}>{title}</Text>
+      <Text style={styles.typeSubtitle}>{subtitle}</Text>
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0a' },
-  inner: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 32, paddingVertical: 48 },
-  title: { fontSize: 32, fontWeight: 'bold', color: '#fff', textAlign: 'center', marginBottom: 8 },
-  subtitle: { fontSize: 16, color: '#888', textAlign: 'center', marginBottom: 24 },
-  typeContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 32 },
+  container: { flex: 1 },
+  keyboard: { flex: 1 },
+  inner: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 44 },
+  title: { fontSize: 36, fontWeight: '900', color: COLORS.white, textAlign: 'center' },
+  subtitle: {
+    fontSize: 15,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  typeContainer: { flexDirection: 'row', gap: 12, marginBottom: 16 },
   typeButton: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
+    minHeight: 118,
+    backgroundColor: COLORS.glass,
+    borderRadius: 24,
     padding: 16,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#333',
-  },
-  typeButtonActive: { borderColor: '#6C63FF', backgroundColor: '#1a1633' },
-  typeEmoji: { fontSize: 32, marginBottom: 8 },
-  typeText: { color: '#888', fontWeight: '600', textAlign: 'center' },
-  typeTextActive: { color: '#6C63FF' },
-  input: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    padding: 16,
-    color: '#fff',
-    fontSize: 16,
-    marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: COLORS.border,
+    justifyContent: 'center',
+    gap: 6,
   },
-  button: {
-    backgroundColor: '#6C63FF',
-    borderRadius: 12,
-    padding: 16,
+  typeButtonActive: {
+    backgroundColor: 'rgba(124, 92, 255, 0.20)',
+    borderColor: COLORS.primary,
+  },
+  typeTitle: { color: COLORS.white, fontWeight: '900', fontSize: 16 },
+  typeSubtitle: { color: COLORS.textMuted, fontSize: 12, fontWeight: '700' },
+  typeTextActive: { color: COLORS.primarySoft },
+  card: {
+    backgroundColor: 'rgba(16, 19, 29, 0.88)',
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 18,
+    gap: 14,
+  },
+  field: {
+    minHeight: 56,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
-    marginTop: 8,
+    gap: 12,
+    backgroundColor: COLORS.input,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 16,
   },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  link: { color: '#888', textAlign: 'center', fontSize: 14 },
-  linkBold: { color: '#6C63FF', fontWeight: 'bold' },
+  input: { flex: 1, color: COLORS.white, fontSize: 16 },
+  button: {
+    minHeight: 56,
+    borderRadius: 18,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  buttonText: { color: COLORS.white, fontSize: 16, fontWeight: '900' },
+  link: { color: COLORS.textMuted, textAlign: 'center', fontSize: 15, marginTop: 22 },
+  linkBold: { color: COLORS.primarySoft, fontWeight: '900' },
 });

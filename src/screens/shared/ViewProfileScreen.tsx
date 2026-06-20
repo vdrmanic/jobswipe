@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
+import { ExperienceItem, ExperienceVerification } from '../../types';
+import { findExperienceVerification, verificationService } from '../../services/verificationService';
 
 export default function ViewProfileScreen({ route, navigation }: any) {
   const { profileId, userType } = route.params;
@@ -16,6 +18,7 @@ export default function ViewProfileScreen({ route, navigation }: any) {
   const [baseProfile, setBaseProfile] = useState<any>(null);
   const [details, setDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [verifications, setVerifications] = useState<ExperienceVerification[]>([]);
 
   const isCompany = userType === 'company';
 
@@ -36,8 +39,13 @@ export default function ViewProfileScreen({ route, navigation }: any) {
       .eq('id', profileId)
       .maybeSingle();
 
+    const verificationRows = isCompany
+      ? []
+      : await verificationService.fetchPublicVerifiedExperiences([profileId]).catch(() => []);
+
     setBaseProfile(profileData);
     setDetails(detailsData);
+    setVerifications(verificationRows);
     setLoading(false);
   };
 
@@ -122,13 +130,26 @@ export default function ViewProfileScreen({ route, navigation }: any) {
           <Text style={styles.sectionTitleSmall}>Iskustvo</Text>
 
           {details?.experience_items?.length ? (
-            details.experience_items.map((item: any, index: number) => (
-              <View key={index} style={styles.expCard}>
-                <Text style={styles.expTitle}>{item.position}</Text>
-                <Text style={styles.expDuration}>{item.duration}</Text>
-                {!!item.description && <Text style={styles.expDesc}>{item.description}</Text>}
-              </View>
-            ))
+            details.experience_items.map((item: ExperienceItem, index: number) => {
+              const verification = findExperienceVerification(verifications, item, index);
+              return (
+                <View key={index} style={styles.expCard}>
+                  <View style={styles.expHeader}>
+                    <View style={styles.expHeading}>
+                      <Text style={styles.expTitle}>{item.position}</Text>
+                      {!!item.company && <Text style={styles.expCompany}>{item.company}</Text>}
+                    </View>
+                    {verification?.status === 'verified' && (
+                      <View style={styles.verifiedBadge}>
+                        <Text style={styles.verifiedBadgeText}>✓ Verifikovano</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.expDuration}>{item.duration}</Text>
+                  {!!item.description && <Text style={styles.expDesc}>{item.description}</Text>}
+                </View>
+              );
+            })
           ) : (
             <Text style={styles.emptyText}>Iskustvo nije dodato.</Text>
           )}
@@ -224,6 +245,11 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   expTitle: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  expHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
+  expHeading: { flex: 1 },
+  expCompany: { color: '#ddd', fontWeight: '700', marginTop: 3 },
+  verifiedBadge: { backgroundColor: 'rgba(52, 211, 153, 0.12)', borderColor: 'rgba(52, 211, 153, 0.42)', borderWidth: 1, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5 },
+  verifiedBadgeText: { color: '#6ee7b7', fontWeight: '900', fontSize: 10 },
   expDuration: { color: '#6C63FF', marginTop: 4 },
   expDesc: { color: '#aaa', marginTop: 8, lineHeight: 20 },
   emptyText: { color: '#888' },
