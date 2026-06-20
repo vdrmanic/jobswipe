@@ -14,6 +14,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 import { ExperienceItem } from '../../types';
 import PositionPicker from '../../components/PositionPicker';
+import ExperienceDurationPicker from '../../components/experience-duration-picker';
 
 const skillCategories = [
   {
@@ -275,13 +276,7 @@ export default function CandidateSetupScreen() {
         onChange={setExpPosition}
       />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Koliko dugo? npr. 6 meseci, 1 godina"
-        placeholderTextColor="#999"
-        value={expDuration}
-        onChangeText={setExpDuration}
-      />
+      <ExperienceDurationPicker value={expDuration} onChange={setExpDuration} />
 
       <TextInput
         style={[styles.input, styles.textAreaSmall]}

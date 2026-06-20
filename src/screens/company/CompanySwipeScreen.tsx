@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import SwipeCard from '../../components/SwipeCard';
+import MatchCelebration from '../../components/MatchCelebration';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
@@ -40,7 +41,7 @@ export default function CompanySwipeScreen({ navigation }: any) {
 
   const currentCandidate = candidates[currentIndex];
 
-  const matchOverlay = matchVisible && matchedCandidate ? (
+  const legacyMatchOverlay = matchVisible && matchedCandidate ? (
     <Animated.View style={[styles.matchOverlay, { opacity: matchAnim }]}>
       <View style={styles.matchOverlayBlur} />
 
@@ -133,16 +134,35 @@ export default function CompanySwipeScreen({ navigation }: any) {
     </Animated.View>
   ) : null;
 
+  const matchOverlay = (
+    <MatchCelebration
+      visible={matchVisible && !!matchedCandidate}
+      candidateAvatar={matchedCandidate?.avatar_url}
+      candidateName={matchName}
+      companyAvatar={profile?.avatar_url}
+      companyName={profile?.full_name}
+      onContinue={() => {
+        setMatchVisible(false);
+        setMatchedCandidate(null);
+      }}
+    />
+  );
+
   const openCandidateProfile = () => {
     if (!currentCandidate) return;
     setCandidateModalVisible(true);
   };
   const navigateToProfile = () => {
     if (!currentCandidate) return;
-    navigation.navigate('ViewProfile', {
-      profileId: currentCandidate.id,
-      userType: 'candidate',
-      returnTo: 'SwipeMain',
+    const candidateId = currentCandidate.id;
+
+    setCandidateModalVisible(false);
+    requestAnimationFrame(() => {
+      navigation.navigate('ViewProfile', {
+        profileId: candidateId,
+        userType: 'candidate',
+        returnTo: 'SwipeMain',
+      });
     });
   };
 
@@ -278,15 +298,6 @@ export default function CompanySwipeScreen({ navigation }: any) {
     setMatchedCandidate(currentCandidate);
     setMatchName(currentCandidate?.display_name || currentCandidate?.full_name || 'Kandidat');
     setMatchVisible(true);
-    matchAnim.setValue(0);
-    Animated.sequence([
-      Animated.timing(matchAnim, { toValue: 1, duration: 500, easing: Easing.out(Easing.exp), useNativeDriver: false }),
-      Animated.delay(1800),
-      Animated.timing(matchAnim, { toValue: 0, duration: 300, easing: Easing.in(Easing.exp), useNativeDriver: false }),
-    ]).start(() => {
-      setMatchVisible(false);
-      setMatchedCandidate(null);
-    });
   };
 
   const handleSwipe = async (direction: 'left' | 'right') => {
@@ -547,8 +558,9 @@ export default function CompanySwipeScreen({ navigation }: any) {
                   <Image source={{ uri: matchedCandidate.avatar_url }} style={styles.matchAvatar} />
                 ) : (
                   <Text style={styles.matchAvatarIcon}>👤</Text>
-                )}
-              </View>
+      )}
+      {matchOverlay}
+    </View>
               <Text style={styles.matchLabel}>Kandidat</Text>
               <Text style={styles.matchPersonName}>{matchedCandidate.display_name || matchedCandidate.full_name || 'Kandidat'}</Text>
             </Animated.View>

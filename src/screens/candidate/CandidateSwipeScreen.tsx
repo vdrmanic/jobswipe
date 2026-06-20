@@ -12,13 +12,13 @@ import {
   useWindowDimensions,
   View,
   Animated,
-  Easing,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import SwipeCard from '../../components/SwipeCard';
+import MatchCelebration from '../../components/MatchCelebration';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 import { JobListing } from '../../types';
@@ -95,7 +95,8 @@ export default function CandidateSwipeScreen({navigation}: any) {
   const [jobMapImageError, setJobMapImageError] = useState(false);
   const [jobMapProviderIndex, setJobMapProviderIndex] = useState(0);
   const [jobMapLayout, setJobMapLayout] = useState({ width: 320, height: 260 });
-  const matchAnim = useRef(new Animated.Value(0)).current;
+  const failedMapProvidersRef = useRef<Set<number>>(new Set());
+  const matchAnim = useRef(new Animated.Value(1)).current;
   const jobPinAnimation = useRef(new Animated.Value(0)).current;
 
   const currentJob = jobs[currentIndex];
@@ -149,44 +150,55 @@ export default function CandidateSwipeScreen({navigation}: any) {
       return geocodeCacheRef.current[normalizedQuery];
     }
 
-    try {
-      const isWeb = Platform.OS === 'web';
-      const webHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-      const url = isWeb
-        ? `http://${webHost}:8787/geocode?q=${encodeURIComponent(query)}`
-        : `https://nominatim.openstreetmap.org/search?format=json&addressdetails=0&limit=1&accept-language=sr-Latn&q=${encodeURIComponent(
-            query
-          )}`;
-      const response = await fetch(
-        url,
-        isWeb ? undefined : {
-          headers: {
-            'Accept-Language': 'sr-Latn',
-          },
+    const isWeb = Platform.OS === 'web';
+    const webHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+    const publicUrl = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=0&limit=1&accept-language=sr-Latn&q=${encodeURIComponent(query)}`;
+    const attempts = isWeb
+      ? [
+          { url: `http://${webHost}:8787/geocode?q=${encodeURIComponent(query)}`, proxied: true },
+          { url: publicUrl, proxied: false },
+        ]
+      : [{ url: publicUrl, proxied: false }];
+
+    for (const attempt of attempts) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4500);
+      try {
+        const response = await fetch(attempt.url, {
+          signal: controller.signal,
+          headers: attempt.proxied ? undefined : { 'Accept-Language': 'sr-Latn' },
+        });
+        if (!response.ok) continue;
+
+        const data = await response.json();
+        const result = attempt.proxied ? data : Array.isArray(data) ? data[0] : null;
+        if (result?.lat && result?.lon) {
+          const coords = { lat: Number(result.lat), lon: Number(result.lon) };
+          geocodeCacheRef.current[normalizedQuery] = coords;
+          return coords;
         }
-      );
-      if (!response.ok) {
-        throw new Error(`Geocoding failed with ${response.status}`);
+      } catch {
+        // Try the next endpoint, then use the local city fallback below.
+      } finally {
+        clearTimeout(timeout);
       }
-      const data = await response.json();
-      const result = isWeb ? data : Array.isArray(data) ? data[0] : null;
-      if (result?.lat && result?.lon) {
-        const coords = { lat: Number(result.lat), lon: Number(result.lon) };
-        geocodeCacheRef.current[normalizedQuery] = coords;
-        return coords;
-      }
-    } catch {
-      // Fall through to city-level coordinates when exact geocoding is unavailable.
     }
 
-    const fallbackCoords = /\d/.test(query) ? null : getLocalCoords(query);
-    geocodeCacheRef.current[normalizedQuery] = fallbackCoords;
+    // A street address often contains a house number. We can still resolve its
+    // city locally when the upstream geocoder is unavailable.
+    const fallbackCoords = getLocalCoords(query);
+    if (fallbackCoords) geocodeCacheRef.current[normalizedQuery] = fallbackCoords;
     return fallbackCoords;
   };
 
-  const handleJobMapError = () => {
-    if (jobMapProviderIndex < tileProviders.length - 1) {
-      setJobMapProviderIndex((index) => index + 1);
+  const handleJobMapError = (providerIndex: number) => {
+    // A map renders nine tiles at once. Advance a failed provider only once,
+    // otherwise simultaneous image errors skip every fallback provider.
+    if (failedMapProvidersRef.current.has(providerIndex)) return;
+    failedMapProvidersRef.current.add(providerIndex);
+
+    if (providerIndex < tileProviders.length - 1) {
+      setJobMapProviderIndex((index) => Math.max(index, providerIndex + 1));
       return;
     }
     setJobMapImageError(true);
@@ -233,7 +245,7 @@ export default function CandidateSwipeScreen({navigation}: any) {
               },
             ]}
             resizeMode="cover"
-            onError={handleJobMapError}
+            onError={() => handleJobMapError(jobMapProviderIndex)}
           />
         );
       }
@@ -302,7 +314,7 @@ export default function CandidateSwipeScreen({navigation}: any) {
     };
   }, [jobLocationCoords, jobPinAnimation]);
 
-  const matchOverlay = matchVisible && matchedJob ? (
+  const legacyMatchOverlay = matchVisible && matchedJob ? (
     <Animated.View style={[styles.matchOverlay, { opacity: matchAnim }]}>
       <View style={styles.matchOverlayBlur} />
 
@@ -394,6 +406,20 @@ export default function CandidateSwipeScreen({navigation}: any) {
       </Animated.View>
     </Animated.View>
   ) : null;
+
+  const matchOverlay = (
+    <MatchCelebration
+      visible={matchVisible && !!matchedJob}
+      candidateAvatar={profile?.avatar_url}
+      candidateName={profile?.full_name}
+      companyAvatar={matchedJob?.companyAvatar}
+      companyName={matchName}
+      onContinue={() => {
+        setMatchVisible(false);
+        setMatchedJob(null);
+      }}
+    />
+  );
 
   const openCompanyProfile = () => {
   if (!currentJob) return;
@@ -575,6 +601,8 @@ export default function CandidateSwipeScreen({navigation}: any) {
 
       setJobMapLoading(true);
       setJobMapImageError(false);
+      setJobMapProviderIndex(0);
+      failedMapProvidersRef.current.clear();
 
       const coords = await geocodeLocation(currentJob.location);
       if (!active) return;
@@ -653,15 +681,6 @@ export default function CandidateSwipeScreen({navigation}: any) {
     setMatchedJob(currentJob);
     setMatchName(currentJob?.companyName || 'Firma');
     setMatchVisible(true);
-    matchAnim.setValue(0);
-    Animated.sequence([
-      Animated.timing(matchAnim, { toValue: 1, duration: 500, easing: Easing.out(Easing.exp), useNativeDriver: false }),
-      Animated.delay(1800),
-      Animated.timing(matchAnim, { toValue: 0, duration: 300, easing: Easing.in(Easing.exp), useNativeDriver: false }),
-    ]).start(() => {
-      setMatchVisible(false);
-      setMatchedJob(null);
-    });
 
     return true;
   };
@@ -1087,6 +1106,7 @@ export default function CandidateSwipeScreen({navigation}: any) {
           </Animated.View>
         </Animated.View>
       )}
+      {matchOverlay}
     </View>
   );
 }
