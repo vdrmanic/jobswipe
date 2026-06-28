@@ -10,6 +10,7 @@ import {
 const BUCKET = 'experience-verification-documents';
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+const ALLOWED_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png', 'webp'];
 
 type VerificationDocument = {
   uri: string;
@@ -43,16 +44,19 @@ const readDocument = async (document: VerificationDocument) => {
   return new ExpoFile(document.uri).arrayBuffer();
 };
 
+const getExtension = (name: string) => name.split('.').pop()?.toLowerCase() || '';
+
 const normalizeMimeType = (document: VerificationDocument) => {
   if (document.mimeType && ALLOWED_MIME_TYPES.includes(document.mimeType)) {
     return document.mimeType;
   }
 
-  const extension = document.name.split('.').pop()?.toLowerCase();
+  const extension = getExtension(document.name);
   if (extension === 'pdf') return 'application/pdf';
   if (extension === 'png') return 'image/png';
   if (extension === 'webp') return 'image/webp';
-  return 'image/jpeg';
+  if (extension === 'jpg' || extension === 'jpeg') return 'image/jpeg';
+  return null;
 };
 
 const safeFileName = (name: string) =>
@@ -120,8 +124,13 @@ export const verificationService = {
       throw new Error('Dokument ne sme biti veci od 10 MB.');
     }
 
+    const extension = getExtension(document.name);
+    if (!ALLOWED_EXTENSIONS.includes(extension)) {
+      throw new Error('Dozvoljeni su samo PDF, JPG, JPEG, PNG i WEBP fajlovi.');
+    }
+
     const mimeType = normalizeMimeType(document);
-    if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
+    if (!mimeType || !ALLOWED_MIME_TYPES.includes(mimeType)) {
       throw new Error('Dozvoljeni su PDF, JPG, PNG i WEBP dokumenti.');
     }
 
@@ -141,7 +150,7 @@ export const verificationService = {
         contentType: mimeType,
         upsert: false,
       }),
-      'Slanje dokumenta traje predugo. Proveri internet i pokusaj ponovo.'
+          'Slanje dokumenta traje predugo. Proveri internet i pokušaj ponovo.'
     );
 
     if (uploadError) throw uploadError;
@@ -163,7 +172,7 @@ export const verificationService = {
         })
         .select('*')
         .single()),
-      'Cuvanje zahteva traje predugo. Pokusaj ponovo.'
+          'Čuvanje zahteva traje predugo. Pokušaj ponovo.'
     );
 
     if (error) {

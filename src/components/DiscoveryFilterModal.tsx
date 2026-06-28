@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import PositionPicker from './PositionPicker';
+import LocationPicker from './LocationPicker';
+import SkillPicker from './SkillPicker';
 import { COLORS } from '../constants';
+import { INPUT_LIMITS } from '../constants/inputLimits';
 import { DiscoveryFilters, DiscoveryMode } from '../types';
 import { defaultDiscoveryFilters } from '../utils/matching';
 
@@ -12,6 +15,8 @@ type Props = {
   value: DiscoveryFilters;
   onApply: (filters: DiscoveryFilters) => void;
   onClose: () => void;
+  tutorialActive?: boolean;
+  onTutorialNext?: () => void;
 };
 
 const jobTypes = ['Puno radno vreme', 'Pola radnog vremena', 'Praksa', 'Ugovor', 'Remote'];
@@ -20,20 +25,20 @@ const experienceLevels = ['junior', 'mid', 'senior'];
 const toggle = (items: string[], value: string) =>
   items.includes(value) ? items.filter((item) => item !== value) : [...items, value];
 
-export default function DiscoveryFilterModal({ visible, mode, value, onApply, onClose }: Props) {
+export default function DiscoveryFilterModal({ visible, mode, value, onApply, onClose, tutorialActive = false, onTutorialNext }: Props) {
   const [draft, setDraft] = useState(value);
-  const [skillsText, setSkillsText] = useState(value.skills.join(', '));
+  const [selectedSkills, setSelectedSkills] = useState(value.skills);
 
   useEffect(() => {
     if (!visible) return;
     setDraft(value);
-    setSkillsText(value.skills.join(', '));
+    setSelectedSkills(value.skills);
   }, [visible, value]);
 
   const apply = () => {
     onApply({
       ...draft,
-      skills: skillsText.split(',').map((item) => item.trim()).filter(Boolean),
+      skills: selectedSkills,
     });
   };
 
@@ -55,25 +60,42 @@ export default function DiscoveryFilterModal({ visible, mode, value, onApply, on
           </View>
 
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+            {tutorialActive && (
+              <View style={styles.tutorialCard}>
+                <View style={styles.tutorialBadge}>
+                  <Ionicons name="sparkles" size={16} color={COLORS.primarySoft} />
+                  <Text style={styles.tutorialBadgeText}>KORAK 3</Text>
+                </View>
+                <Text style={styles.tutorialTitle}>Pronađi baš ono što ti odgovara</Text>
+                <Text style={styles.tutorialText}>
+                  {mode === 'candidate'
+                    ? 'Ovde sužavaš oglase prema poziciji, lokaciji, veštinama i tipu posla. Minimalno poklapanje uklanja oglase koji se slabije uklapaju u tvoj profil.'
+                    : 'Ovde sužavaš kandidate prema poziciji, lokaciji, veštinama i iskustvu. Možeš prikazati samo provereno iskustvo i odrediti minimalni procenat poklapanja.'}
+                </Text>
+                <Text style={styles.tutorialHint}>Filteri se pamte za sledeće otvaranje, a dugme „Resetuj“ vraća prikaz svih rezultata.</Text>
+                <TouchableOpacity style={styles.tutorialNextButton} onPress={onTutorialNext}>
+                  <Text style={styles.tutorialNextText}>Razumem, nastavi</Text>
+                  <Ionicons name="arrow-forward" size={17} color={COLORS.white} />
+                </TouchableOpacity>
+              </View>
+            )}
+
             <FieldLabel text="Pozicija" />
-            <PositionPicker value={draft.position} onChange={(position) => setDraft((prev) => ({ ...prev, position }))} />
+            <PositionPicker value={draft.position} onChange={(position) => setDraft((prev) => ({ ...prev, position }))} maxLength={INPUT_LIMITS.position} />
 
             <FieldLabel text="Lokacija" />
-            <TextInput
+            <LocationPicker
               value={draft.location}
-              onChangeText={(location) => setDraft((prev) => ({ ...prev, location }))}
-              placeholder="Grad ili deo adrese"
-              placeholderTextColor={COLORS.lightGray}
-              style={styles.input}
+              onChange={(location) => setDraft((prev) => ({ ...prev, location }))}
+              placeholder="Unesi prva 3 slova grada"
+              maxLength={INPUT_LIMITS.filterText}
             />
 
-            <FieldLabel text={mode === 'candidate' ? 'Vestine koje oglas mora da trazi' : 'Obavezne vestine kandidata'} />
-            <TextInput
-              value={skillsText}
-              onChangeText={setSkillsText}
-              placeholder="React, prodaja, Excel..."
-              placeholderTextColor={COLORS.lightGray}
-              style={styles.input}
+            <SkillPicker
+        label={mode === 'candidate' ? 'Veštine koje oglas mora da traži' : 'Obavezne veštine kandidata'}
+              placeholder="Izaberi veštine iz menija"
+              value={selectedSkills}
+              onChange={setSelectedSkills}
             />
 
             {mode === 'candidate' ? (
@@ -131,7 +153,7 @@ export default function DiscoveryFilterModal({ visible, mode, value, onApply, on
               style={styles.resetButton}
               onPress={() => {
                 setDraft(defaultDiscoveryFilters);
-                setSkillsText('');
+                setSelectedSkills([]);
               }}
             >
               <Text style={styles.resetText}>Resetuj</Text>
@@ -168,8 +190,17 @@ const styles = StyleSheet.create({
   title: { color: COLORS.white, fontSize: 22, fontWeight: '900', marginTop: 2 },
   closeButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 18, paddingBottom: 28 },
+  tutorialCard: { padding: 16, marginBottom: 18, borderRadius: 18, borderWidth: 1, borderColor: 'rgba(124,92,255,0.55)', backgroundColor: 'rgba(124,92,255,0.13)' },
+  tutorialBadge: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10, backgroundColor: 'rgba(124,92,255,0.18)' },
+  tutorialBadgeText: { color: COLORS.primarySoft, fontSize: 10, fontWeight: '900' },
+  tutorialTitle: { color: COLORS.white, fontSize: 18, fontWeight: '900', marginTop: 12 },
+  tutorialText: { color: COLORS.textSoft, fontSize: 13, lineHeight: 20, marginTop: 7 },
+  tutorialHint: { color: COLORS.textMuted, fontSize: 12, lineHeight: 18, marginTop: 8 },
+  tutorialNextButton: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 14, borderRadius: 14, backgroundColor: COLORS.primary },
+  tutorialNextText: { color: COLORS.white, fontSize: 13, fontWeight: '900' },
   label: { color: COLORS.textSoft, fontSize: 12, fontWeight: '900', marginBottom: 8, marginTop: 5 },
   input: { minHeight: 52, borderRadius: 15, backgroundColor: COLORS.input, borderWidth: 1, borderColor: COLORS.border, color: COLORS.white, paddingHorizontal: 14, marginBottom: 14 },
+  counter: { color: COLORS.textMuted, fontSize: 10, fontWeight: '800', textAlign: 'right', marginTop: -9, marginBottom: 12 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   scoreRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { minHeight: 40, paddingHorizontal: 13, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.glass },

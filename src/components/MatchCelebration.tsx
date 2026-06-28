@@ -24,6 +24,7 @@ type MatchCelebrationProps = {
   candidateName?: string | null;
   companyAvatar?: string | null;
   companyName?: string | null;
+  jobTitle?: string | null;
   visible: boolean;
   onContinue: () => void;
 };
@@ -59,6 +60,7 @@ export default function MatchCelebration({
   candidateName,
   companyAvatar,
   companyName,
+  jobTitle,
   visible,
   onContinue,
 }: MatchCelebrationProps) {
@@ -204,8 +206,8 @@ export default function MatchCelebration({
             <Ionicons name="chatbubbles" size={22} color={COLORS.primarySoft} />
           </View>
           <View style={styles.actionCopy}>
-            <Text style={styles.actionTitle}>Match je sacuvan</Text>
-            <Text style={styles.actionText}>Pronaci ces ga u tabu Mecevi i tamo mozes zapoceti razgovor.</Text>
+              <Text style={styles.actionTitle}>Match je sačuvan{jobTitle ? ` za ${jobTitle}` : ''}</Text>
+            <Text style={styles.actionText}>Pronaći ćeš ga u tabu Mečevi i tamo možeš započeti razgovor.</Text>
           </View>
         </Animated.View>
 

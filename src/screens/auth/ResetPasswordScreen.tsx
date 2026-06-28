@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../hooks/useAuth';
 import { COLORS } from '../../constants';
+import { INPUT_LIMITS } from '../../constants/inputLimits';
 
 export default function ResetPasswordScreen({ navigation }: any) {
   const { resetPassword } = useAuth();
@@ -22,7 +23,7 @@ export default function ResetPasswordScreen({ navigation }: any) {
 
   const handleReset = async () => {
     if (!email.trim()) {
-      Alert.alert('Greska', 'Unesi email adresu');
+      Alert.alert('Greška', 'Unesi email adresu');
       return;
     }
 
@@ -31,14 +32,14 @@ export default function ResetPasswordScreen({ navigation }: any) {
     try {
       const { error } = await resetPassword(email.trim());
       if (error) {
-        Alert.alert('Greska', error.message);
+        Alert.alert('Greška', error.message);
         return;
       }
 
       Alert.alert('Proveri email', 'Poslali smo link za reset lozinke. Proveri inbox.');
       navigation.goBack();
     } catch (e: any) {
-      Alert.alert('Greska', e?.message || 'Doslo je do problema pri slanju emaila.');
+      Alert.alert('Greška', e?.message || 'Došlo je do problema pri slanju emaila.');
     } finally {
       setLoading(false);
     }
@@ -55,7 +56,7 @@ export default function ResetPasswordScreen({ navigation }: any) {
             <Ionicons name="key" size={30} color={COLORS.primarySoft} />
           </View>
           <Text style={styles.title}>Reset lozinke</Text>
-          <Text style={styles.subtitle}>Unesi email i poslacemo ti link za povratak u nalog.</Text>
+          <Text style={styles.subtitle}>Unesi email i poslaćemo ti link za povratak u nalog.</Text>
 
           <View style={styles.card}>
             <View style={styles.field}>
@@ -68,11 +69,12 @@ export default function ResetPasswordScreen({ navigation }: any) {
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                maxLength={INPUT_LIMITS.email}
               />
             </View>
 
             <TouchableOpacity style={styles.button} onPress={handleReset} disabled={loading}>
-              {loading ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.buttonText}>Posalji link</Text>}
+          {loading ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.buttonText}>Pošalji link</Text>}
             </TouchableOpacity>
           </View>
 

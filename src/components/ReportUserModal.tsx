@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Alert, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants';
+import { INPUT_LIMITS } from '../constants/inputLimits';
 import { safetyService } from '../services';
 
 const reasons = [
@@ -37,7 +38,7 @@ export default function ReportUserModal({ visible, currentUserId, reportedUserId
       setDetails('');
       onClose();
     } catch (error: any) {
-      Alert.alert('Prijava nije poslata', error?.message || 'Pokusaj ponovo.');
+      Alert.alert('Prijava nije poslata', error?.message || 'Pokušaj ponovo.');
     } finally {
       setSubmitting(false);
     }
@@ -50,7 +51,7 @@ export default function ReportUserModal({ visible, currentUserId, reportedUserId
       onBlocked?.();
       onClose();
     } catch (error: any) {
-      Alert.alert('Blokiranje nije uspelo', error?.message || 'Pokusaj ponovo.');
+      Alert.alert('Blokiranje nije uspelo', error?.message || 'Pokušaj ponovo.');
     } finally {
       setSubmitting(false);
     }
@@ -79,15 +80,17 @@ export default function ReportUserModal({ visible, currentUserId, reportedUserId
             onChangeText={setDetails}
             placeholder="Dodatni detalji, opciono"
             placeholderTextColor={COLORS.lightGray}
+            maxLength={INPUT_LIMITS.reportDetails}
             multiline
           />
+          <Text style={styles.charCounter}>{details.length}/{INPUT_LIMITS.reportDetails}</Text>
           <View style={styles.actions}>
             <TouchableOpacity style={styles.blockButton} onPress={block} disabled={submitting}>
               <Ionicons name="ban" size={18} color={COLORS.secondary} />
               <Text style={styles.blockText}>Blokiraj</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.reportButton, !reason && styles.disabled]} onPress={submit} disabled={!reason || submitting}>
-              {submitting ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.reportText}>Posalji prijavu</Text>}
+          {submitting ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.reportText}>Pošalji prijavu</Text>}
             </TouchableOpacity>
           </View>
         </View>
@@ -108,6 +111,7 @@ const styles = StyleSheet.create({
   reasonText: { color: COLORS.textMuted, fontSize: 12, fontWeight: '800' },
   reasonTextSelected: { color: COLORS.secondary },
   input: { minHeight: 90, borderRadius: 15, backgroundColor: COLORS.input, color: COLORS.white, padding: 13, marginTop: 14, textAlignVertical: 'top' },
+  charCounter: { color: COLORS.textMuted, fontSize: 10, fontWeight: '800', textAlign: 'right', marginTop: 6 },
   actions: { flexDirection: 'row', gap: 10, marginTop: 14 },
   blockButton: { flex: 1, minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7, backgroundColor: COLORS.dangerBg },
   blockText: { color: COLORS.secondary, fontWeight: '900' },

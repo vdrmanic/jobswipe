@@ -57,7 +57,7 @@ export const notificationService = {
 
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
-        name: 'JobSwipe',
+        name: 'JobHop',
         importance: Notifications.AndroidImportance.HIGH,
       });
     }
@@ -79,4 +79,5 @@ export const notificationService = {
   async dispatchPending() {
     await supabase.functions.invoke('send-push-notifications');
   },
+
 };

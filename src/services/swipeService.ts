@@ -5,8 +5,18 @@ import { SwipeAction } from '../types';
 export const swipeService = {
   async recordSwipe(swipe: SwipeAction) {
     try {
-      const { error } = await supabase.from('swipes').insert(swipe);
+      const swipeWithDecisionTime = {
+        ...swipe,
+        decided_at: new Date().toISOString(),
+      };
+
+      const { data, error } = await supabase
+        .from('swipes')
+        .upsert(swipeWithDecisionTime, { onConflict: 'swiper_id,target_id,target_type,job_id' })
+        .select()
+        .single();
       if (error) throw error;
+      return data;
     } catch (error) {
       throw handleError(error);
     }
@@ -15,13 +25,16 @@ export const swipeService = {
   async fetchSwipedIds(
     userId: string,
     targetType: 'job' | 'candidate',
+    jobId?: string,
   ): Promise<string[]> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('swipes')
         .select('target_id')
         .eq('swiper_id', userId)
         .eq('target_type', targetType);
+      if (jobId) query = query.eq('job_id', jobId);
+      const { data, error } = await query;
 
       if (error) throw error;
       return (data ?? []).map((s) => s.target_id);
@@ -52,6 +65,28 @@ export const swipeService = {
         rightSwipes: rightSwipes || 0,
         leftSwipes: leftSwipes || 0,
       };
+    } catch (error) {
+      throw handleError(error);
+    }
+  },
+
+  async resetCandidateDecisions(): Promise<number> {
+    try {
+      const { data, error } = await supabase.rpc('reset_candidate_swipes_after_30_days');
+      if (error) throw error;
+      return Number(data || 0);
+    } catch (error) {
+      throw handleError(error);
+    }
+  },
+
+  async resetCompanyJobDecisions(jobId: string): Promise<number> {
+    try {
+      const { data, error } = await supabase.rpc('reset_company_job_swipes_after_30_days', {
+        target_job_id: jobId,
+      });
+      if (error) throw error;
+      return Number(data || 0);
     } catch (error) {
       throw handleError(error);
     }

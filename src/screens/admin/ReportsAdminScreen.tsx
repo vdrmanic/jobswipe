@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { safetyService, verificationService } from '../../services';
 import { UserReport } from '../../types';
 import { COLORS } from '../../constants';
+import { INPUT_LIMITS } from '../../constants/inputLimits';
 
 export default function ReportsAdminScreen({ navigation }: any) {
   const { user } = useAuth();
@@ -25,7 +26,7 @@ export default function ReportsAdminScreen({ navigation }: any) {
 
   const review = async (id: string, status: 'dismissed' | 'actioned') => {
     try { await safetyService.reviewReport(id, status, note); setNote(''); load(); }
-    catch (error: any) { Alert.alert('Greska', error?.message || 'Odluka nije sacuvana.'); }
+    catch (error: any) { Alert.alert('Greška', error?.message || 'Odluka nije sačuvana.'); }
   };
 
   if (loading) return <View style={styles.center}><ActivityIndicator color={COLORS.primarySoft} /></View>;
@@ -35,20 +36,20 @@ export default function ReportsAdminScreen({ navigation }: any) {
     <View style={styles.screen}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}><Ionicons name="chevron-back" size={22} color={COLORS.primarySoft} /></TouchableOpacity>
-        <View><Text style={styles.eyebrow}>JOBSWIPE ADMIN</Text><Text style={styles.title}>Prijave korisnika</Text></View>
+        <View><Text style={styles.eyebrow}>JOBHOP ADMIN</Text><Text style={styles.title}>Prijave korisnika</Text></View>
       </View>
       <FlatList
         data={reports}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
-        ListEmptyComponent={<Text style={styles.empty}>Nema prijava na cekanju.</Text>}
+        ListEmptyComponent={<Text style={styles.empty}>Nema prijava na čekanju.</Text>}
         renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={styles.row}><Ionicons name="warning" size={20} color={COLORS.secondary} /><Text style={styles.reason}>{item.reason}</Text></View>
             <Text style={styles.meta}>Prijavio: {item.reporter?.full_name || item.reporter_id}</Text>
             <Text style={styles.meta}>Prijavljen: {item.reported_user?.full_name || item.reported_user_id}</Text>
             {!!item.details && <Text style={styles.details}>{item.details}</Text>}
-            <TextInput style={styles.input} value={note} onChangeText={setNote} placeholder="Admin napomena" placeholderTextColor={COLORS.lightGray} />
+            <TextInput style={styles.input} value={note} onChangeText={setNote} placeholder="Admin napomena" placeholderTextColor={COLORS.lightGray} maxLength={INPUT_LIMITS.adminNote} />
             <View style={styles.actions}>
               <TouchableOpacity style={styles.dismiss} onPress={() => review(item.id, 'dismissed')}><Text style={styles.dismissText}>Odbaci</Text></TouchableOpacity>
               <TouchableOpacity style={styles.action} onPress={() => review(item.id, 'actioned')}><Text style={styles.actionText}>Preduzeta mera</Text></TouchableOpacity>

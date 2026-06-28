@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -14,16 +15,19 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../hooks/useAuth';
 import { COLORS } from '../../constants';
+import { INPUT_LIMITS } from '../../constants/inputLimits';
+const appIcon = require('../../../assets/icon.png');
 
 export default function LoginScreen({ navigation }: any) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const { signIn, signInWithGoogle } = useAuth();
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Greska', 'Unesite email i lozinku');
+      Alert.alert('Greška', 'Unesite email i lozinku');
       return;
     }
 
@@ -32,7 +36,17 @@ export default function LoginScreen({ navigation }: any) {
     setLoading(false);
 
     if (error) {
-      Alert.alert('Greska', error.message);
+      Alert.alert('Greška', error.message);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setGoogleLoading(true);
+    const { error } = await signInWithGoogle();
+    setGoogleLoading(false);
+
+    if (error) {
+      Alert.alert('Google prijava', error.message);
     }
   };
 
@@ -44,9 +58,9 @@ export default function LoginScreen({ navigation }: any) {
       >
         <View style={styles.inner}>
           <View style={styles.brandMark}>
-            <Ionicons name="briefcase" size={32} color={COLORS.primarySoft} />
+            <Image source={appIcon} style={styles.brandIcon} resizeMode="cover" />
           </View>
-          <Text style={styles.title}>JobSwipe</Text>
+          <Text style={styles.title}>JobHop</Text>
           <Text style={styles.subtitle}>Swajpuj pametnije. Upoznaj posao koji stvarno ima smisla.</Text>
 
           <View style={styles.card}>
@@ -60,6 +74,7 @@ export default function LoginScreen({ navigation }: any) {
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                maxLength={INPUT_LIMITS.email}
               />
             </View>
 
@@ -72,6 +87,7 @@ export default function LoginScreen({ navigation }: any) {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
+                maxLength={INPUT_LIMITS.password}
               />
             </View>
 
@@ -86,6 +102,23 @@ export default function LoginScreen({ navigation }: any) {
               )}
             </TouchableOpacity>
 
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>ili</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin} disabled={googleLoading}>
+              {googleLoading ? (
+                <ActivityIndicator color={COLORS.white} />
+              ) : (
+                <>
+                  <Ionicons name="logo-google" size={20} color={COLORS.white} />
+                  <Text style={styles.googleButtonText}>Prijavi se preko Google-a</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
             <TouchableOpacity onPress={() => navigation.navigate('ResetPassword')}>
               <Text style={styles.link}>Zaboravio/la si lozinku?</Text>
             </TouchableOpacity>
@@ -93,7 +126,7 @@ export default function LoginScreen({ navigation }: any) {
 
           <TouchableOpacity onPress={() => navigation.navigate('Register')}>
             <Text style={styles.footerLink}>
-              Nemas nalog? <Text style={styles.linkBold}>Registruj se</Text>
+              Nemaš nalog? <Text style={styles.linkBold}>Registruj se</Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -117,7 +150,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     marginBottom: 18,
+    overflow: 'hidden',
   },
+  brandIcon: { width: 58, height: 58, borderRadius: 18 },
   title: { fontSize: 40, fontWeight: '900', color: COLORS.white, textAlign: 'center' },
   subtitle: {
     fontSize: 16,
@@ -159,6 +194,21 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   buttonText: { color: COLORS.white, fontSize: 16, fontWeight: '900' },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: COLORS.border },
+  dividerText: { color: COLORS.textMuted, fontSize: 12, fontWeight: '800' },
+  googleButton: {
+    minHeight: 54,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  googleButtonText: { color: COLORS.white, fontSize: 15, fontWeight: '900' },
   link: { color: COLORS.textMuted, textAlign: 'center', fontSize: 14, fontWeight: '700' },
   footerLink: { color: COLORS.textMuted, textAlign: 'center', fontSize: 15, marginTop: 22 },
   linkBold: { color: COLORS.primarySoft, fontWeight: '900' },

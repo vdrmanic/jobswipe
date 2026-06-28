@@ -106,7 +106,7 @@ messageService.fetchUnreadCount(userId, userType)
 ```typescript
 import { swipeService } from '../../services';
 
-swipeService.recordSwipe(swipe)  // { swiper_id, target_id, target_type, direction }
+swipeService.recordSwipe(swipe)  // { swiper_id, target_id, target_type, job_id, direction }
 swipeService.fetchSwipedIds(userId, targetType)
 swipeService.fetchSwipeStats(userId, userType)
 ```

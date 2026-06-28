@@ -14,6 +14,22 @@ Migracija dodaje:
 - prijave korisnika i admin moderation red;
 - RLS pravila i realtime za notifikacije.
 
+Zatim pokreni i:
+
+`supabase/migrations/202606210002_job_scoped_company_swipes.sql`
+
+Ova migracija vezuje svaki swipe firme za konkretan oglas. Postojeci swipeovi
+kandidata se cuvaju i automatski povezuju sa oglasom, dok se stari swipeovi
+firme resetuju jer iz njih nije moguce pouzdano zakljuciti na koji oglas su se
+odnosili.
+
+Na kraju pokreni:
+
+`supabase/migrations/202606210003_job_growth_suite.sql`
+
+Ova migracija dodaje detalje oglasa, nacrte, pipeline kandidata, zakazivanje
+intervjua, obavestenja o promeni statusa i dogadjaje potrebne za analitiku.
+
 Admin za prijave koristi isti nalog koji postoji u `verification_admins`.
 
 ## Push notifikacije

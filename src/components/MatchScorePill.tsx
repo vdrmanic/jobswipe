@@ -20,13 +20,25 @@ export default function MatchScorePill({ result }: { result: MatchScore }) {
             <View style={styles.scoreCircle}>
               <Text style={styles.score}>{result.score}%</Text>
             </View>
-            <Text style={styles.title}>Zasto ovaj rezultat?</Text>
+            <Text style={styles.title}>Zašto ovaj rezultat?</Text>
             {(result.reasons.length ? result.reasons : ['Profil nema dovoljno podataka za precizniji rezultat.']).map((reason) => (
               <View key={reason} style={styles.reason}>
                 <Ionicons name="checkmark-circle" size={18} color={COLORS.mint} />
                 <Text style={styles.reasonText}>{reason}</Text>
               </View>
             ))}
+            {!!result.matchedSkills.length && (
+              <View style={styles.skillsBlock}>
+                <Text style={styles.skillsLabel}>Poklopljene veštine</Text>
+                <Text style={styles.skillsGood}>{result.matchedSkills.join(' • ')}</Text>
+              </View>
+            )}
+            {!!result.missingSkills?.length && (
+              <View style={styles.skillsBlock}>
+                <Text style={styles.skillsLabel}>Još se traži</Text>
+                <Text style={styles.skillsMissing}>{result.missingSkills.slice(0, 4).join(' • ')}</Text>
+              </View>
+            )}
             <TouchableOpacity style={styles.button} onPress={() => setVisible(false)}>
               <Text style={styles.buttonText}>Razumem</Text>
             </TouchableOpacity>
@@ -47,6 +59,10 @@ const styles = StyleSheet.create({
   title: { color: COLORS.white, fontSize: 20, fontWeight: '900', marginVertical: 16 },
   reason: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 9 },
   reasonText: { color: COLORS.textSoft, fontSize: 13, lineHeight: 18, flex: 1 },
+  skillsBlock: { width: '100%', marginTop: 10, padding: 12, borderRadius: 14, backgroundColor: COLORS.glass },
+  skillsLabel: { color: COLORS.textMuted, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 6 },
+  skillsGood: { color: COLORS.mint, fontSize: 12, lineHeight: 18, fontWeight: '800' },
+  skillsMissing: { color: COLORS.gold, fontSize: 12, lineHeight: 18, fontWeight: '800' },
   button: { width: '100%', minHeight: 50, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primary, marginTop: 14 },
   buttonText: { color: COLORS.white, fontWeight: '900' },
 });

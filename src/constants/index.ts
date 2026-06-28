@@ -1,6 +1,7 @@
 export * from './colors';
 export * from './routes';
 export * from './sizes';
+export * from './swipes';
 
 export const TAB_BAR_HEIGHT = 64;
 export const SWIPE_THRESHOLD = 120;

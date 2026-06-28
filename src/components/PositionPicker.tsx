@@ -3,11 +3,13 @@ import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-nativ
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants';
 import { JOB_POSITIONS } from '../constants/jobPositions';
+import { INPUT_LIMITS } from '../constants/inputLimits';
 
 type Props = {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  maxLength?: number;
 };
 
 const normalize = (value: string) =>
@@ -18,7 +20,7 @@ const normalize = (value: string) =>
     .replace(/đ/g, 'dj')
     .trim();
 
-export default function PositionPicker({ value, onChange, placeholder = 'Izaberi poziciju' }: Props) {
+export default function PositionPicker({ value, onChange, placeholder = 'Izaberi poziciju', maxLength = INPUT_LIMITS.position }: Props) {
   const [query, setQuery] = useState(value);
   const [open, setOpen] = useState(false);
 
@@ -61,11 +63,12 @@ export default function PositionPicker({ value, onChange, placeholder = 'Izaberi
             onChange('');
             setOpen(true);
           }}
+          maxLength={maxLength}
           autoCorrect={false}
         />
         {!!query && (
           <TouchableOpacity
-            accessibilityLabel="Obriši poziciju"
+          accessibilityLabel="Obriši poziciju"
             style={styles.clearButton}
             onPress={() => {
               setQuery('');
@@ -77,6 +80,7 @@ export default function PositionPicker({ value, onChange, placeholder = 'Izaberi
           </TouchableOpacity>
         )}
       </View>
+      <Text style={styles.counter}>{query.length}/{maxLength}</Text>
 
       {open && (
         <View style={styles.suggestions}>
@@ -93,7 +97,7 @@ export default function PositionPicker({ value, onChange, placeholder = 'Izaberi
             </View>
           )}
           {!!query && query !== value && (
-            <Text style={styles.hint}>Izaberi jednu od ponuđenih pozicija.</Text>
+            <Text style={styles.hint}>Izaberi jednu od ponudjenih pozicija.</Text>
           )}
         </View>
       )}
@@ -116,6 +120,7 @@ const styles = StyleSheet.create({
   },
   inputRowActive: { borderColor: COLORS.primary },
   input: { flex: 1, color: COLORS.white, fontSize: 16, paddingVertical: 14 },
+  counter: { color: COLORS.textMuted, fontSize: 10, fontWeight: '800', textAlign: 'right', marginTop: 5 },
   clearButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   suggestions: {
     marginTop: 6,
@@ -139,3 +144,4 @@ const styles = StyleSheet.create({
   emptyText: { color: COLORS.textMuted, fontSize: 13 },
   hint: { color: COLORS.primarySoft, fontSize: 11, fontWeight: '700', padding: 10 },
 });
+

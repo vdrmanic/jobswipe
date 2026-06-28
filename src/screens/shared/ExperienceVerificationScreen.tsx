@@ -56,7 +56,7 @@ const acceptedDocuments = [
   },
   {
     title: 'Evidencija staza ili potvrda osiguranja',
-    detail: 'Prihvata se kada jasno pokazuje poslodavca i odgovarajuci period.',
+    detail: 'Prihvata se kada jasno pokazuje poslodavca i odgovarajući period.',
   },
   {
     title: 'Obracunski listic',
@@ -71,6 +71,15 @@ const acceptedDocuments = [
     detail: 'Kartica ili bedz sami nisu dovoljni, ali mogu dopuniti drugi dokument.',
   },
 ];
+
+const ALLOWED_DOCUMENT_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+const ALLOWED_DOCUMENT_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png', 'webp'];
+
+const isAllowedVerificationDocument = (asset: DocumentPicker.DocumentPickerAsset) => {
+  const extension = asset.name.split('.').pop()?.toLowerCase() || '';
+  const mimeTypeAllowed = !asset.mimeType || ALLOWED_DOCUMENT_MIME_TYPES.includes(asset.mimeType);
+  return ALLOWED_DOCUMENT_EXTENSIONS.includes(extension) && mimeTypeAllowed;
+};
 
 export default function ExperienceVerificationScreen({ route, navigation }: any) {
   const { experience, experienceIndex } = route.params as {
@@ -111,7 +120,14 @@ export default function ExperienceVerificationScreen({ route, navigation }: any)
     });
 
     if (!result.canceled) {
-      setDocument(result.assets[0]);
+      const asset = result.assets[0];
+      if (!isAllowedVerificationDocument(asset)) {
+        setDocument(null);
+        setSubmitError('Dozvoljeni su samo PDF, JPG, JPEG, PNG i WEBP fajlovi.');
+        Alert.alert('Fajl nije dozvoljen', 'Za verifikaciju možeš poslati samo PDF, JPG, JPEG, PNG ili WEBP.');
+        return;
+      }
+      setDocument(asset);
       setSubmitError(null);
     }
   };
@@ -157,7 +173,7 @@ export default function ExperienceVerificationScreen({ route, navigation }: any)
       console.info('[verification] submit completed', created.id);
       Alert.alert('Poslato', 'Dokument je dodat u red za rucnu proveru.');
     } catch (error: any) {
-      const message = error?.message || 'Pokusaj ponovo.';
+      const message = error?.message || 'Pokušaj ponovo.';
       console.error('[verification] submit failed', error);
       setSubmitError(message);
       Alert.alert('Slanje nije uspelo', message);
@@ -207,7 +223,7 @@ export default function ExperienceVerificationScreen({ route, navigation }: any)
             <Ionicons name="documents-outline" size={21} color={COLORS.primarySoft} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.documentsTitle}>Dokumenti koje mozes poslati</Text>
+            <Text style={styles.documentsTitle}>Dokumenti koje možeš poslati</Text>
             <Text style={styles.documentsSubtitle}>Dovoljan je jedan jasan i verodostojan dokaz.</Text>
           </View>
         </View>
@@ -248,7 +264,7 @@ export default function ExperienceVerificationScreen({ route, navigation }: any)
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.documentTitle}>{document?.name || 'Dodaj dokument ili fotografiju'}</Text>
-              <Text style={styles.documentSubtitle}>PDF, JPG, PNG ili WEBP, najvise 10 MB</Text>
+              <Text style={styles.documentSubtitle}>PDF, JPG, PNG ili WEBP, najviše 10 MB</Text>
             </View>
             <Ionicons name="chevron-forward" size={19} color={COLORS.textMuted} />
           </TouchableOpacity>
@@ -263,7 +279,7 @@ export default function ExperienceVerificationScreen({ route, navigation }: any)
               <ActivityIndicator color={COLORS.white} />
             ) : (
               <>
-                <Text style={styles.submitText}>Posalji na proveru</Text>
+                <Text style={styles.submitText}>Pošalji na proveru</Text>
                 <Ionicons name="arrow-forward" size={18} color={COLORS.white} />
               </>
             )}
@@ -275,7 +291,7 @@ export default function ExperienceVerificationScreen({ route, navigation }: any)
             <Text style={styles.progressText}>
               {submitStep === 'reading' && 'Citam dokument...'}
               {submitStep === 'uploading' && 'Saljem dokument...'}
-              {submitStep === 'saving' && 'Cuvam zahtev...'}
+              {submitStep === 'saving' && 'Čuvam zahtev...'}
             </Text>
           )}
           {!!submitError && (

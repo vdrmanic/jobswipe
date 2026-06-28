@@ -1,10 +1,16 @@
 {
   "expo": {
-    "name": "JobSwipe",
-    "slug": "JobSwipe",
+    "name": "JobHop",
+    "slug": "jobhop",
+    "scheme": "jobhop",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#566EFF"
+    },
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true
@@ -23,7 +29,10 @@
     },
     "plugins": [
       "expo-font",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-sqlite",
+      "expo-web-browser",
+      "expo-video"
     ]
   }
 }

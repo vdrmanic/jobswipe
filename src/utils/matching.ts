@@ -32,6 +32,11 @@ const durationToLevel = (items: CandidateProfile['experience_items']) => {
   return 'junior';
 };
 
+const candidatePositionText = (candidate: Pick<CandidateProfile, 'position' | 'experience_items'>) =>
+  [candidate.position, ...(candidate.experience_items || []).map((item) => item.position)]
+    .filter(Boolean)
+    .join(' ');
+
 export const defaultDiscoveryFilters: DiscoveryFilters = {
   position: '',
   location: '',
@@ -44,22 +49,24 @@ export const defaultDiscoveryFilters: DiscoveryFilters = {
 
 export const scoreJobForCandidate = (
   job: JobListing,
-  candidate: Pick<CandidateProfile, 'position' | 'skills' | 'job_type'>,
+  candidate: Pick<CandidateProfile, 'position' | 'skills' | 'job_type' | 'experience_items'>,
   candidateLocation?: string | null
 ): MatchScore => {
   let score = 0;
   const reasons: string[] = [];
   const matchedSkills = overlap(candidate.skills || [], job.skills_required || []);
+  const matchedSkillSet = new Set(matchedSkills.map(normalize));
+  const missingSkills = (job.skills_required || []).filter((skill) => !matchedSkillSet.has(normalize(skill)));
 
-  if (textMatches(candidate.position, job.title)) {
+  if (textMatches(candidatePositionText(candidate), job.title)) {
     score += 40;
-    reasons.push('Pozicija odgovara onome sto trazis');
+    reasons.push('Iskustvo odgovara poziciji iz oglasa');
   }
 
   if ((job.skills_required || []).length) {
     const skillRatio = matchedSkills.length / Math.max(job.skills_required?.length || 1, 1);
     score += Math.round(skillRatio * 35);
-    if (matchedSkills.length) reasons.push(`${matchedSkills.length} trazenih vestina se poklapa`);
+    if (matchedSkills.length) reasons.push(`${matchedSkills.length} traženih veština se poklapa`);
   } else {
     score += 18;
   }
@@ -74,7 +81,12 @@ export const scoreJobForCandidate = (
     reasons.push('Tip posla odgovara');
   }
 
-  return { score: Math.min(score, 100), reasons: reasons.slice(0, 3), matchedSkills };
+  if (job.work_mode && /remote|od kuce/.test(normalize(job.work_mode))) {
+    score += 5;
+    reasons.push('Oglas podrzava rad na daljinu');
+  }
+
+  return { score: Math.min(score, 100), reasons: reasons.slice(0, 4), matchedSkills, missingSkills };
 };
 
 export const scoreCandidateForJob = (
@@ -92,7 +104,7 @@ export const scoreCandidateForJob = (
     reasons.push('Ima verifikovano iskustvo');
   }
 
-  return { ...base, score, reasons: reasons.slice(0, 3) };
+  return { ...base, score, reasons: reasons.slice(0, 4) };
 };
 
 export const candidatePassesFilters = (
@@ -102,7 +114,7 @@ export const candidatePassesFilters = (
   hasVerifiedExperience: boolean,
   score: number
 ) =>
-  (!filters.position || textMatches(candidate.position, filters.position)) &&
+  (!filters.position || textMatches(candidatePositionText(candidate), filters.position)) &&
   (!filters.location || textMatches(profile.location, filters.location)) &&
   (!filters.skills.length || overlap(candidate.skills || [], filters.skills).length === filters.skills.length) &&
   (!filters.experienceLevels.length || filters.experienceLevels.includes(candidate.experience_level || durationToLevel(candidate.experience_items))) &&

@@ -60,7 +60,7 @@ const proxy = http.createServer(async (request, response) => {
     const upstream = await fetch(upstreamUrl, {
       headers: {
         'Accept-Language': 'sr-Latn',
-        'User-Agent': 'JobSwipe/1.0 (local Expo development)',
+        'User-Agent': 'JobHop/1.0 (local Expo development)',
       },
     });
 

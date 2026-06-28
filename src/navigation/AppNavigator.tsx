@@ -44,7 +44,7 @@ function LoadingScreen() {
       >
         <ActivityIndicator size="large" color={COLORS.primarySoft} />
       </View>
-      <Text style={{ color: COLORS.textMuted, fontWeight: '700' }}>Ucitavanje...</Text>
+      <Text style={{ color: COLORS.textMuted, fontWeight: '700' }}>Učitavanje...</Text>
     </LinearGradient>
   );
 }
@@ -58,18 +58,18 @@ function MissingProfileScreen() {
       style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}
     >
       <Text style={{ color: COLORS.white, fontSize: 24, fontWeight: '900', marginBottom: 12 }}>
-        Profil nije pronadjen
+        Profil nije pronađen
       </Text>
 
       <Text style={{ color: COLORS.textMuted, textAlign: 'center', marginBottom: 24, lineHeight: 22 }}>
-        Nalog postoji, ali profil nije pronadjen u tabeli profiles.
+        Nalog postoji, ali profil nije pronađen u tabeli profiles.
       </Text>
 
       <TouchableOpacity
         onPress={refreshProfile}
         style={{ backgroundColor: COLORS.primary, padding: 16, borderRadius: 16, marginBottom: 12, minWidth: 190, alignItems: 'center' }}
       >
-        <Text style={{ color: COLORS.white, fontWeight: '900' }}>Pokusaj ponovo</Text>
+        <Text style={{ color: COLORS.white, fontWeight: '900' }}>Pokušaj ponovo</Text>
       </TouchableOpacity>
 
       <TouchableOpacity

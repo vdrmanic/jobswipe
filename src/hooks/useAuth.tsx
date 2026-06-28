@@ -1,7 +1,11 @@
+import { makeRedirectUri } from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
 import { Session, User } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Profile } from '../types';
+
+WebBrowser.maybeCompleteAuthSession();
 
 interface AuthContextType {
   session: Session | null;
@@ -9,6 +13,7 @@ interface AuthContextType {
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>; 
+  signInWithGoogle: (userType?: Profile['user_type']) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string, userType: Profile['user_type']) => Promise<{ error: Error | null }>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -21,6 +26,7 @@ const AuthContext = createContext<AuthContextType>({
   profile: null,
   loading: true,
   signIn: async () => ({ error: null }),
+  signInWithGoogle: async () => ({ error: null }),
   signUp: async () => ({ error: null }),
   resetPassword: async () => ({ error: null }),
   signOut: async () => {},
@@ -49,6 +55,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(data ?? null);
   };
 
+  const createOAuthProfile = async (authUser: User, userType: Profile['user_type']) => {
+    const fullName =
+      authUser.user_metadata?.full_name ||
+      authUser.user_metadata?.name ||
+      authUser.email?.split('@')[0] ||
+      'JobHop korisnik';
+
+    const { error: profileError } = await supabase.from('profiles').insert({
+      id: authUser.id,
+      user_type: userType,
+      full_name: String(fullName).trim(),
+      avatar_url: authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null,
+    });
+
+    if (profileError) return profileError;
+
+    if (userType === 'candidate') {
+      const { error } = await supabase.from('candidate_profiles').insert({ id: authUser.id });
+      return error;
+    }
+
+    const { error } = await supabase.from('company_profiles').insert({ id: authUser.id });
+    return error;
+  };
+
+  const ensureOAuthProfile = async (authUser: User, userType?: Profile['user_type']) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', authUser.id)
+      .maybeSingle();
+
+    if (error) return { profileData: null, error };
+    if (data) return { profileData: data as Profile, error: null };
+
+    if (!userType) {
+      return {
+        profileData: null,
+        error: new Error('Google nalog postoji, ali nema JobHop profil. Registruj se preko Google dugmeta i izaberi tip naloga.'),
+      };
+    }
+
+    const createError = await createOAuthProfile(authUser, userType);
+    if (createError) return { profileData: null, error: createError };
+
+    const { data: createdProfile, error: fetchError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', authUser.id)
+      .maybeSingle();
+
+    return { profileData: (createdProfile as Profile | null) ?? null, error: fetchError };
+  };
+
   const refreshProfile = async () => {
     const currentUser = user || session?.user;
     if (currentUser) {
@@ -73,6 +133,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: null };
     } catch (error: any) {
       return { error: new Error(error?.message || 'Neuspešna prijava') };
+    }
+  };
+
+  const signInWithGoogle = async (userType?: Profile['user_type']) => {
+    const redirectTo = makeRedirectUri({ path: 'auth/callback' });
+
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+        },
+      });
+
+      if (error) return { error };
+      if (!data?.url) return { error: new Error('Google prijava nije pokrenuta.') };
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+      if (result.type !== 'success') {
+        return { error: result.type === 'cancel' ? null : new Error('Google prijava je prekinuta.') };
+      }
+
+      const parsedUrl = new URL(result.url);
+      const code = parsedUrl.searchParams.get('code');
+      if (!code) return { error: new Error('Google prijava nije vratila validan kod.') };
+
+      const { data: sessionData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+      if (exchangeError) return { error: exchangeError };
+      if (!sessionData.session || !sessionData.user) {
+        return { error: new Error('Google sesija nije kreirana.') };
+      }
+
+      const { profileData, error: profileError } = await ensureOAuthProfile(sessionData.user, userType);
+      if (profileError) {
+        await supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        return { error: profileError };
+      }
+
+      setSession(sessionData.session);
+      setUser(sessionData.user);
+      setProfile(profileData);
+
+      return { error: null };
+    } catch (error: any) {
+      return { error: new Error(error?.message || 'Google prijava nije uspela.') };
     }
   };
 
@@ -205,6 +314,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profile,
         loading,
         signIn,
+        signInWithGoogle,
         signUp,
         resetPassword,
         signOut,

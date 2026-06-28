@@ -16,15 +16,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../hooks/useAuth';
 import { COLORS } from '../../constants';
+import { INPUT_LIMITS } from '../../constants/inputLimits';
 import { UserType } from '../../types';
 
 export default function RegisterScreen({ navigation }: any) {
-  const { signUp } = useAuth();
+  const { signUp, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [userType, setUserType] = useState<UserType>('candidate');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const handleRegister = async () => {
     const trimmedEmail = email.trim();
@@ -32,23 +34,23 @@ export default function RegisterScreen({ navigation }: any) {
     const trimmedFullName = fullName.trim();
 
     if (!trimmedEmail || !trimmedPassword || !trimmedFullName) {
-      Alert.alert('Greska', 'Popunite sva polja');
+      Alert.alert('Greška', 'Popunite sva polja');
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(trimmedEmail)) {
-      Alert.alert('Greska', 'Unesi validan email');
+      Alert.alert('Greška', 'Unesi validan email');
       return;
     }
 
     if (trimmedPassword.length < 8) {
-      Alert.alert('Greska', 'Lozinka mora imati najmanje 8 karaktera');
+      Alert.alert('Greška', 'Lozinka mora imati najmanje 8 karaktera');
       return;
     }
 
     if (trimmedFullName.length < 3) {
-      Alert.alert('Greska', 'Unesi puno ime i prezime');
+      Alert.alert('Greška', 'Unesi puno ime i prezime');
       return;
     }
 
@@ -57,12 +59,22 @@ export default function RegisterScreen({ navigation }: any) {
     setLoading(false);
 
     if (error) {
-      Alert.alert('Greska', error.message);
+      Alert.alert('Greška', error.message);
       return;
     }
 
     Alert.alert('Uspeh', 'Nalog je kreiran. Ako je potrebna verifikacija, proveri inbox.');
     navigation.navigate('Login');
+  };
+
+  const handleGoogleRegister = async () => {
+    setGoogleLoading(true);
+    const { error } = await signInWithGoogle(userType);
+    setGoogleLoading(false);
+
+    if (error) {
+      Alert.alert('Google registracija', error.message);
+    }
   };
 
   return (
@@ -73,21 +85,21 @@ export default function RegisterScreen({ navigation }: any) {
       >
         <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
           <Text style={styles.title}>Kreiraj nalog</Text>
-          <Text style={styles.subtitle}>Izaberi stranu trzista i napravi profil koji moze da matchuje.</Text>
+          <Text style={styles.subtitle}>Izaberi stranu tržišta i napravi profil koji može da mečuje.</Text>
 
           <View style={styles.typeContainer}>
             <TypeOption
               active={userType === 'candidate'}
               icon="person"
               title="Kandidat"
-              subtitle="Trazim posao"
+              subtitle="Tražim posao"
               onPress={() => setUserType('candidate')}
             />
             <TypeOption
               active={userType === 'company'}
               icon="business"
               title="Firma"
-              subtitle="Trazim radnike"
+              subtitle="Tražim radnike"
               onPress={() => setUserType('company')}
             />
           </View>
@@ -96,10 +108,11 @@ export default function RegisterScreen({ navigation }: any) {
             <Field icon="person-outline">
               <TextInput
                 style={styles.input}
-                placeholder={userType === 'candidate' ? 'Ime i prezime' : 'Vase ime'}
+                placeholder={userType === 'candidate' ? 'Ime i prezime' : 'Vaše ime'}
                 placeholderTextColor={COLORS.lightGray}
                 value={fullName}
                 onChangeText={setFullName}
+                maxLength={INPUT_LIMITS.fullName}
               />
             </Field>
             <Field icon="mail-outline">
@@ -111,6 +124,7 @@ export default function RegisterScreen({ navigation }: any) {
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                maxLength={INPUT_LIMITS.email}
               />
             </Field>
             <Field icon="lock-closed-outline">
@@ -121,17 +135,35 @@ export default function RegisterScreen({ navigation }: any) {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
+                maxLength={INPUT_LIMITS.password}
               />
             </Field>
 
             <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
               {loading ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.buttonText}>Registruj se</Text>}
             </TouchableOpacity>
+
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>ili</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <TouchableOpacity style={styles.googleButton} onPress={handleGoogleRegister} disabled={googleLoading}>
+              {googleLoading ? (
+                <ActivityIndicator color={COLORS.white} />
+              ) : (
+                <>
+                  <Ionicons name="logo-google" size={20} color={COLORS.white} />
+                  <Text style={styles.googleButtonText}>Registruj se preko Google-a</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity onPress={() => navigation.navigate('Login')}>
             <Text style={styles.link}>
-              Vec imas nalog? <Text style={styles.linkBold}>Prijavi se</Text>
+              Već imaš nalog? <Text style={styles.linkBold}>Prijavi se</Text>
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -232,6 +264,21 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   buttonText: { color: COLORS.white, fontSize: 16, fontWeight: '900' },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: COLORS.border },
+  dividerText: { color: COLORS.textMuted, fontSize: 12, fontWeight: '800' },
+  googleButton: {
+    minHeight: 54,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  googleButtonText: { color: COLORS.white, fontSize: 15, fontWeight: '900' },
   link: { color: COLORS.textMuted, textAlign: 'center', fontSize: 15, marginTop: 22 },
   linkBold: { color: COLORS.primarySoft, fontWeight: '900' },
 });

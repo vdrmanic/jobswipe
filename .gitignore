@@ -1,5 +1,10 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
+*.md
+.claude/
+.codex/
+.agents/
+
 # dependencies
 node_modules/
 
@@ -8,6 +13,11 @@ node_modules/
 dist/
 web-build/
 expo-env.d.ts
+.expo-server*.log
+expo-go-qr.png
+
+# Supabase local state
+supabase/.temp/
 
 # Native
 .kotlin/

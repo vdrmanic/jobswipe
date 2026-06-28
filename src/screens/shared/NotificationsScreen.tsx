@@ -37,11 +37,15 @@ export default function NotificationsScreen({ navigation }: any) {
         data={items}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
-        ListEmptyComponent={<Text style={styles.empty}>Jos nema notifikacija.</Text>}
+        ListEmptyComponent={<Text style={styles.empty}>Još nema notifikacija.</Text>}
         renderItem={({ item }) => (
           <TouchableOpacity
             style={[styles.item, !item.read_at && styles.unread]}
-            onPress={async () => { if (!item.read_at) await notificationService.markRead(item.id); load(); }}
+            onPress={async () => {
+              if (!item.read_at) await notificationService.markRead(item.id);
+              if (item.data?.match_id || item.data?.job_id) navigation.getParent()?.navigate('Matches');
+              load();
+            }}
           >
             <View style={styles.itemIcon}><Ionicons name={icons[item.type]} size={20} color={COLORS.primarySoft} /></View>
             <View style={{ flex: 1 }}><Text style={styles.itemTitle}>{item.title}</Text><Text style={styles.body}>{item.body}</Text><Text style={styles.date}>{new Date(item.created_at).toLocaleString()}</Text></View>

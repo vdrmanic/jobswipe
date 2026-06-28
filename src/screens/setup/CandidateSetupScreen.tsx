@@ -1,8 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,66 +9,48 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 import { ExperienceItem } from '../../types';
+import AddressPicker from '../../components/AddressPicker';
+import SkillPicker from '../../components/SkillPicker';
 import PositionPicker from '../../components/PositionPicker';
 import ExperienceDurationPicker from '../../components/experience-duration-picker';
-
-const skillCategories = [
-  {
-    key: 'it',
-    label: 'IT & razvoj',
-    skills: ['JavaScript', 'TypeScript', 'React', 'React Native', 'Node.js', 'Python', 'AWS', 'SQL', 'DevOps'],
-  },
-  {
-    key: 'marketing',
-    label: 'Marketing',
-    skills: ['SEO', 'Google Ads', 'Facebook Ads', 'Copywriting', 'Content marketing', 'Email marketing', 'Analitika'],
-  },
-  {
-    key: 'sales',
-    label: 'Prodaja',
-    skills: ['B2B prodaja', 'Cold calling', 'CRM', 'Pregovaranje', 'Lead generation', 'Prezentacije'],
-  },
-  {
-    key: 'usluge',
-    label: 'Usluge',
-    skills: ['Rad s ljudima', 'Služenje pića', 'Organizacija', 'Hotelski servis', 'Kuhinja', 'Recepcija'],
-  },
-  {
-    key: 'other',
-    label: 'Ostalo',
-    skills: ['Komunikacija', 'Timwork', 'Vođenje projekata', 'Administracija', 'Logistika'],
-  },
-];
+import { COLORS } from '../../constants';
+import { INPUT_LIMITS } from '../../constants/inputLimits';
 
 export default function CandidateSetupScreen() {
   const { user, refreshProfile } = useAuth();
 
-  const [position, setPosition] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState(skillCategories[0].key);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-  const [skillModalVisible, setSkillModalVisible] = useState(false);
   const [location, setLocation] = useState('');
   const [bio, setBio] = useState('');
-
   const [expCompany, setExpCompany] = useState('');
   const [expPosition, setExpPosition] = useState('');
   const [expDuration, setExpDuration] = useState('');
   const [expDescription, setExpDescription] = useState('');
   const [experienceItems, setExperienceItems] = useState<ExperienceItem[]>([]);
-
   const [loading, setLoading] = useState(false);
+
+  const completionCount = useMemo(() => {
+    let count = 0;
+    if (location.trim()) count += 1;
+    if (selectedSkills.length > 0) count += 1;
+    if (bio.trim()) count += 1;
+    if (experienceItems.length > 0) count += 1;
+    return count;
+  }, [bio, experienceItems.length, location, selectedSkills.length]);
 
   const addExperience = () => {
     if (!expCompany.trim() || !expPosition.trim() || !expDuration.trim()) {
-      Alert.alert('Greška', 'Unesi poziciju i trajanje iskustva');
+      Alert.alert('Nedostaju podaci', 'Unesi firmu, poziciju i trajanje iskustva.');
       return;
     }
 
-    setExperienceItems([
-      ...experienceItems,
+    setExperienceItems((items) => [
+      ...items,
       {
         company: expCompany.trim(),
         position: expPosition.trim(),
@@ -85,19 +66,19 @@ export default function CandidateSetupScreen() {
   };
 
   const removeExperience = (index: number) => {
-    setExperienceItems(experienceItems.filter((_, i) => i !== index));
+    setExperienceItems((items) => items.filter((_, itemIndex) => itemIndex !== index));
   };
 
   const saveProfile = async () => {
     if (!user) return;
 
     if (!location.trim()) {
-      Alert.alert('Greška', 'Unesi lokaciju');
+      Alert.alert('Lokacija je obavezna', 'Unesi prva 3 slova i izaberi adresu gde živiš.');
       return;
     }
 
     if (selectedSkills.length === 0) {
-      Alert.alert('Greška', 'Izaberi bar jednu veštinu');
+      Alert.alert('Veštine su obavezne', 'Izaberi bar jednu veštinu iz menija.');
       return;
     }
 
@@ -112,7 +93,7 @@ export default function CandidateSetupScreen() {
       .eq('id', user.id);
 
     if (profileError) {
-      Alert.alert('Greška profile', profileError.message);
+        Alert.alert('Profil nije sačuvan', profileError.message);
       setLoading(false);
       return;
     }
@@ -120,7 +101,7 @@ export default function CandidateSetupScreen() {
     const { error: candidateError } = await supabase
       .from('candidate_profiles')
       .update({
-        position: position.trim() || null,
+        position: null,
         experience_level: null,
         skills: selectedSkills,
         experience_items: experienceItems,
@@ -128,353 +109,238 @@ export default function CandidateSetupScreen() {
       .eq('id', user.id);
 
     if (candidateError) {
-      Alert.alert('Greška candidate', candidateError.message);
+        Alert.alert('Profil nije sačuvan', candidateError.message);
       setLoading(false);
       return;
     }
 
     await refreshProfile();
     setLoading(false);
-    Alert.alert('Uspeh', 'Profil je sačuvan!');
+      Alert.alert('Profil sačuvan', 'Spreman si za pregled oglasa.');
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.inner}>
+    <ScrollView
+      style={styles.container}
+      contentInsetAdjustmentBehavior="automatic"
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={styles.inner}
+    >
       <View style={styles.pageInner}>
-        <Text style={styles.title}>Popuni profil 👤</Text>
-        <Text style={styles.subtitle}>Firme će ovo videti kada pregledaju kandidate.</Text>
+        <LinearGradient colors={['#221B55', '#101827', '#080A12']} style={styles.hero}>
+          <View style={styles.heroGlow} />
+          <View style={styles.heroIcon}>
+            <Ionicons name="person-add-outline" size={28} color={COLORS.primarySoft} />
+          </View>
+          <View style={styles.heroCopy}>
+            <Text style={styles.eyebrow}>KANDIDAT WORKSPACE</Text>
+            <Text style={styles.title}>Popuni profil</Text>
+            <Text style={styles.subtitle}>
+              Dodaj lokaciju, veštine i iskustvo da bi JobHop mogao preciznije da izračuna poklapanje sa oglasima.
+            </Text>
+          </View>
+          <View style={styles.progressPill}>
+            <Ionicons name="sparkles-outline" size={15} color={COLORS.primarySoft} />
+            <Text style={styles.progressText}>{completionCount}/4</Text>
+          </View>
+        </LinearGradient>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Lokacija *"
-        placeholderTextColor="#999"
-        value={location}
-        onChangeText={setLocation}
-      />
-
-      <PositionPicker
-        placeholder="Pozicija koju tražiš, opciono"
-        value={position}
-        onChange={setPosition}
-      />
-
-      <Text style={styles.sectionTitle}>Veštine</Text>
-      <Text style={styles.sectionSubtitle}>Klikni da izabereš veštine iz popup liste.</Text>
-
-      <TouchableOpacity style={styles.skillPickerButton} onPress={() => setSkillModalVisible(true)}>
-        <Text style={styles.skillPickerTitle}>Odabrane veštine</Text>
-        <Text style={styles.skillPickerSubtitle}>
-          {selectedSkills.length > 0 ? selectedSkills.join(', ') : 'Klikni za otvaranje liste'}
-        </Text>
-      </TouchableOpacity>
-
-      <Modal transparent animationType="fade" visible={skillModalVisible}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalHeader}>Izaberi veštine</Text>
-
-            <ScrollView contentContainerStyle={styles.modalContent}>
-              <View style={styles.categoryRow}> 
-                {skillCategories.map((category) => (
-                  <TouchableOpacity
-                    key={category.key}
-                    style={[
-                      styles.categoryButton,
-                      selectedCategory === category.key && styles.categoryButtonActive,
-                    ]}
-                    onPress={() => setSelectedCategory(category.key)}
-                  >
-                    <Text
-                      style={[
-                        styles.categoryButtonText,
-                        selectedCategory === category.key && styles.categoryButtonTextActive,
-                      ]}
-                    >
-                      {category.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <View style={styles.skillsRowModal}>
-                {skillCategories
-                  .find((category) => category.key === selectedCategory)
-                  ?.skills.map((skill) => {
-                    const selected = selectedSkills.includes(skill);
-                    return (
-                      <TouchableOpacity
-                        key={skill}
-                        style={[styles.skillChip, selected && styles.skillChipSelected]}
-                        onPress={() => {
-                          setSelectedSkills((prev) =>
-                            prev.includes(skill)
-                              ? prev.filter((item) => item !== skill)
-                              : [...prev, skill]
-                          );
-                        }}
-                      >
-                        <Text style={[styles.skillText, selected && styles.skillTextSelected]}>{skill}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-              </View>
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity style={styles.modalCloseButton} onPress={() => setSkillModalVisible(false)}>
-                <Text style={styles.modalCloseText}>Zatvori</Text>
-              </TouchableOpacity>
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionIcon}>
+              <Ionicons name="location-outline" size={21} color={COLORS.primarySoft} />
+            </View>
+            <View style={styles.sectionCopy}>
+              <Text style={styles.sectionEyebrow}>01 / LOKACIJA</Text>
+              <Text style={styles.sectionTitle}>Gde živiš</Text>
+              <Text style={styles.sectionSubtitle}>Unesi bar 3 slova i izaberi adresu. Ovo koristimo za udaljenost od posla.</Text>
             </View>
           </View>
+          <AddressPicker value={location} onChange={setLocation} placeholder="npr. Pavla Vujisica, Beograd" />
         </View>
-      </Modal>
 
-      <Text style={styles.helpText}>
-        {selectedSkills.length > 0
-          ? `Odabrane veštine: ${selectedSkills.join(', ')}`
-          : 'Odaberi najmanje jednu veštinu iz popup-a.'}
-      </Text>
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionIcon}>
+              <Ionicons name="sparkles-outline" size={21} color={COLORS.primarySoft} />
+            </View>
+            <View style={styles.sectionCopy}>
+              <Text style={styles.sectionEyebrow}>02 / VESTINE</Text>
+              <Text style={styles.sectionTitle}>Šta znaš da radiš?</Text>
+              <Text style={styles.sectionSubtitle}>Izaberi veštine iz menija. One su glavni signal za poklapanje sa oglasima.</Text>
+            </View>
+          </View>
+          <SkillPicker
+            label="Veštine"
+            placeholder="Izaberi veštine koje najbolje opisuju tvoj rad"
+            value={selectedSkills}
+            onChange={setSelectedSkills}
+          />
+        </View>
 
-      <TextInput
-        style={[styles.input, styles.textArea]}
-        placeholder="O sebi"
-        placeholderTextColor="#999"
-        value={bio}
-        onChangeText={setBio}
-        multiline
-      />
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionIcon}>
+              <Ionicons name="document-text-outline" size={21} color={COLORS.primarySoft} />
+            </View>
+            <View style={styles.sectionCopy}>
+              <Text style={styles.sectionEyebrow}>03 / O TEBI</Text>
+              <Text style={styles.sectionTitle}>Kratak opis</Text>
+              <Text style={styles.sectionSubtitle}>Neka bude jasno, kratko i konkretno. Ovo firme vide na profilu.</Text>
+            </View>
+          </View>
+          <View style={styles.fieldLabelRow}>
+            <Text style={styles.fieldLabel}>O sebi</Text>
+            <Text style={styles.charCounter}>{bio.length}/{INPUT_LIMITS.bio}</Text>
+          </View>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            placeholder="Npr. Radim brzo, volim rad sa ljudima i tražim stabilan tim..."
+            placeholderTextColor={COLORS.lightGray}
+            value={bio}
+            onChangeText={setBio}
+            maxLength={INPUT_LIMITS.bio}
+            multiline
+          />
+        </View>
 
-      <Text style={styles.sectionTitle}>Iskustvo</Text>
-      <Text style={styles.sectionSubtitle}>
-        Dodaj prethodne pozicije ako želiš. Ovo nije obavezno.
-      </Text>
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionIcon}>
+              <Ionicons name="briefcase-outline" size={21} color={COLORS.primarySoft} />
+            </View>
+            <View style={styles.sectionCopy}>
+              <Text style={styles.sectionEyebrow}>04 / ISKUSTVO</Text>
+              <Text style={styles.sectionTitle}>Šta si radio do sada?</Text>
+              <Text style={styles.sectionSubtitle}>Nije obavezno za start, ali pomaze firmama da te bolje razumeju.</Text>
+            </View>
+          </View>
 
-      {experienceItems.map((item, index) => (
-        <View key={index} style={styles.experienceCard}>
-          {!!item.company && <Text style={styles.experienceCompany}>{item.company}</Text>}
-          <Text style={styles.experienceTitle}>{item.position}</Text>
-          <Text style={styles.experienceDuration}>{item.duration}</Text>
-          {!!item.description && <Text style={styles.experienceDesc}>{item.description}</Text>}
+          {experienceItems.map((item, index) => (
+            <View key={`${item.position}-${index}`} style={styles.experienceCard}>
+              <View style={styles.experienceMarker} />
+              <View style={styles.experienceCopy}>
+                {!!item.company && <Text style={styles.experienceCompany}>{item.company}</Text>}
+                <Text style={styles.experienceTitle}>{item.position}</Text>
+                <Text style={styles.experienceDuration}>{item.duration}</Text>
+                {!!item.description && <Text style={styles.experienceDesc}>{item.description}</Text>}
+              </View>
+              <TouchableOpacity style={styles.removeButton} onPress={() => removeExperience(index)}>
+                <Ionicons name="trash-outline" size={18} color={COLORS.secondary} />
+              </TouchableOpacity>
+            </View>
+          ))}
 
-          <TouchableOpacity onPress={() => removeExperience(index)}>
-            <Text style={styles.removeText}>Ukloni</Text>
+          <View style={styles.fieldLabelRow}>
+            <Text style={styles.fieldLabel}>Firma</Text>
+            <Text style={styles.charCounter}>{expCompany.length}/{INPUT_LIMITS.experienceCompany}</Text>
+          </View>
+          <TextInput
+            style={styles.input}
+            placeholder="Firma u kojoj si radio"
+            placeholderTextColor={COLORS.lightGray}
+            value={expCompany}
+            onChangeText={setExpCompany}
+            maxLength={INPUT_LIMITS.experienceCompany}
+          />
+
+          <Text style={styles.fieldLabel}>Pozicija</Text>
+          <PositionPicker
+            placeholder="Pozicija na kojoj si radio"
+            value={expPosition}
+            onChange={setExpPosition}
+            maxLength={INPUT_LIMITS.position}
+          />
+
+          <ExperienceDurationPicker value={expDuration} onChange={setExpDuration} />
+
+          <View style={styles.fieldLabelRow}>
+            <Text style={styles.fieldLabel}>Opis iskustva</Text>
+            <Text style={styles.charCounter}>{expDescription.length}/{INPUT_LIMITS.experienceDescription}</Text>
+          </View>
+          <TextInput
+            style={[styles.input, styles.textAreaSmall]}
+            placeholder="Šta si radio i šta je bio rezultat?"
+            placeholderTextColor={COLORS.lightGray}
+            value={expDescription}
+            onChangeText={setExpDescription}
+            maxLength={INPUT_LIMITS.experienceDescription}
+            multiline
+          />
+
+          <TouchableOpacity style={styles.secondaryButton} onPress={addExperience} activeOpacity={0.84}>
+            <Ionicons name="add" size={19} color={COLORS.primarySoft} />
+            <Text style={styles.secondaryButtonText}>Dodaj iskustvo</Text>
           </TouchableOpacity>
         </View>
-      ))}
 
-      <TextInput
-        style={styles.input}
-        placeholder="Firma u kojoj si radio"
-        placeholderTextColor="#999"
-        value={expCompany}
-        onChangeText={setExpCompany}
-      />
-
-      <PositionPicker
-        placeholder="Pozicija na kojoj si radio"
-        value={expPosition}
-        onChange={setExpPosition}
-      />
-
-      <ExperienceDurationPicker value={expDuration} onChange={setExpDuration} />
-
-      <TextInput
-        style={[styles.input, styles.textAreaSmall]}
-        placeholder="Opis iskustva, opciono"
-        placeholderTextColor="#999"
-        value={expDescription}
-        onChangeText={setExpDescription}
-        multiline
-      />
-
-      <TouchableOpacity style={styles.secondaryButton} onPress={addExperience}>
-        <Text style={styles.secondaryButtonText}>+ Dodaj iskustvo</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.button} onPress={saveProfile} disabled={loading}>
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sačuvaj profil</Text>}
-      </TouchableOpacity>
+        <View style={styles.saveDock}>
+          <View style={styles.saveCopy}>
+            <Text style={styles.saveTitle}>Spreman profil?</Text>
+            <Text style={styles.saveSubtitle}>Kasnije uvek možeš da ga izmeniš iz profila.</Text>
+          </View>
+          <TouchableOpacity style={styles.saveTouch} onPress={saveProfile} disabled={loading} activeOpacity={0.86}>
+            <LinearGradient colors={[COLORS.primary, '#9B6DFF']} style={styles.saveButton}>
+              {loading ? <ActivityIndicator color={COLORS.white} /> : <Ionicons name="checkmark-circle" size={20} color={COLORS.white} />}
+              <Text style={styles.saveButtonText}>{loading ? 'Čuvanje...' : 'Sačuvaj profil'}</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0a' },
-  inner: { padding: 24, paddingTop: 60, paddingBottom: 40, alignItems: 'center' },
-  pageInner: {
-    width: '100%',
-    maxWidth: 760,
-    alignItems: 'center',
-    alignSelf: 'center',
-  },
-  title: { color: '#fff', fontSize: 30, fontWeight: 'bold', marginBottom: 8, textAlign: 'center' },
-  subtitle: { color: '#888', fontSize: 15, marginBottom: 28 },
-  sectionTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold', marginTop: 12, marginBottom: 6 },
-  sectionSubtitle: { color: '#888', marginBottom: 16 },
-  skillPickerButton: {
-    width: '100%',
-    maxWidth: 720,
-    backgroundColor: '#161616',
+  container: { flex: 1, backgroundColor: COLORS.dark },
+  inner: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 42 },
+  pageInner: { width: '100%', maxWidth: 820, alignSelf: 'center', gap: 16 },
+  hero: {
+    minHeight: 220,
+    borderRadius: 30,
     borderWidth: 1,
-    borderColor: '#333',
-    borderRadius: 18,
-    paddingVertical: 18,
-    paddingHorizontal: 16,
-    marginBottom: 16,
+    borderColor: COLORS.border,
+    overflow: 'hidden',
+    padding: 22,
+    gap: 14,
+    boxShadow: '0px 18px 44px rgba(0,0,0,0.26)',
   },
-  skillPickerTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  skillPickerSubtitle: {
-    color: '#aaa',
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  categoryRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 16,
-    justifyContent: 'center',
-  },
-  categoryButton: {
-    borderWidth: 1,
-    borderColor: '#333',
-    borderRadius: 999,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    margin: 4,
-    backgroundColor: '#111',
-  },
-  categoryButtonActive: {
-    backgroundColor: '#6C63FF',
-    borderColor: '#6C63FF',
-  },
-  categoryButtonText: {
-    color: '#ccc',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  categoryButtonTextActive: {
-    color: '#fff',
-  },
-  skillChip: {
-    borderWidth: 1,
-    borderColor: '#333',
-    borderRadius: 999,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    margin: 4,
-    backgroundColor: '#111',
-  },
-  skillChipSelected: {
-    backgroundColor: '#6C63FF',
-    borderColor: '#6C63FF',
-  },
-  skillText: {
-    color: '#ccc',
-    fontSize: 13,
-  },
-  skillTextSelected: {
-    color: '#fff',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.62)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  modalBox: {
-    width: '100%',
-    maxWidth: 760,
-    backgroundColor: '#0f0f14',
-    borderRadius: 24,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: '#222',
-    maxHeight: '85%',
-  },
-  modalHeader: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '900',
-    marginBottom: 14,
-    textAlign: 'center',
-  },
-  modalContent: {
-    paddingBottom: 14,
-  },
-  skillsRowModal: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 10,
-  },
-  modalFooter: {
-    marginTop: 12,
-    alignItems: 'center',
-  },
-  modalCloseButton: {
-    backgroundColor: '#6C63FF',
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 26,
-  },
-  modalCloseText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  helpText: {
-    color: '#aaa',
-    fontSize: 13,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  input: {
-    width: '100%',
-    maxWidth: 720,
-    backgroundColor: '#1a1a1a',
-    borderColor: '#333',
-    borderWidth: 1,
-    color: '#fff',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 14,
-    fontSize: 16,
-  },
-  textArea: { minHeight: 100, textAlignVertical: 'top' },
-  textAreaSmall: { minHeight: 80, textAlignVertical: 'top' },
-  experienceCard: {
-    backgroundColor: '#151515',
-    borderColor: '#333',
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
-  },
-  experienceTitle: { color: '#fff', fontSize: 17, fontWeight: 'bold' },
-  experienceCompany: { color: '#a8b2ff', fontSize: 13, fontWeight: '800', marginBottom: 4 },
-  experienceDuration: { color: '#6C63FF', marginTop: 4, marginBottom: 6 },
-  experienceDesc: { color: '#aaa', marginBottom: 10 },
-  removeText: { color: '#ff5c5c', fontWeight: 'bold' },
-  secondaryButton: {
-    borderColor: '#6C63FF',
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 15,
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  secondaryButtonText: { color: '#6C63FF', fontWeight: 'bold' },
-  button: {
-    backgroundColor: '#6C63FF',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  heroGlow: { position: 'absolute', width: 260, height: 260, borderRadius: 130, right: -80, top: -110, backgroundColor: 'rgba(124,92,255,0.24)' },
+  heroIcon: { width: 58, height: 58, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(124,92,255,0.16)', borderWidth: 1, borderColor: COLORS.border },
+  heroCopy: { gap: 6 },
+  eyebrow: { color: COLORS.primarySoft, fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
+  title: { color: COLORS.white, fontSize: 34, lineHeight: 39, fontWeight: '900', letterSpacing: -0.8 },
+  subtitle: { color: COLORS.textSoft, fontSize: 14, lineHeight: 21, maxWidth: 620 },
+  progressPill: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: COLORS.glass, borderWidth: 1, borderColor: COLORS.border },
+  progressText: { color: COLORS.white, fontSize: 12, fontWeight: '900' },
+  sectionCard: { padding: 20, borderRadius: 24, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border, gap: 16, boxShadow: '0px 14px 34px rgba(0,0,0,0.14)' },
+  sectionHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 13 },
+  sectionIcon: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(124,92,255,0.15)' },
+  sectionCopy: { flex: 1 },
+  sectionEyebrow: { color: COLORS.primarySoft, fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  sectionTitle: { color: COLORS.white, fontSize: 19, lineHeight: 24, fontWeight: '900', marginTop: 3 },
+  sectionSubtitle: { color: COLORS.textMuted, fontSize: 13, lineHeight: 19, marginTop: 4 },
+  fieldLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  fieldLabel: { color: COLORS.textSoft, fontSize: 12, fontWeight: '900' },
+  charCounter: { color: COLORS.textMuted, fontSize: 10, fontWeight: '800' },
+  input: { minHeight: 54, borderRadius: 15, backgroundColor: COLORS.input, borderWidth: 1, borderColor: COLORS.border, color: COLORS.white, paddingHorizontal: 14, fontSize: 15 },
+  textArea: { minHeight: 104, paddingTop: 14, textAlignVertical: 'top' },
+  textAreaSmall: { minHeight: 86, paddingTop: 14, textAlignVertical: 'top' },
+  experienceCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14, borderRadius: 18, backgroundColor: COLORS.cardRaised, borderWidth: 1, borderColor: COLORS.border },
+  experienceMarker: { width: 10, height: 10, borderRadius: 5, marginTop: 6, backgroundColor: COLORS.primarySoft },
+  experienceCopy: { flex: 1, gap: 3 },
+  experienceCompany: { color: COLORS.primarySoft, fontSize: 12, fontWeight: '900' },
+  experienceTitle: { color: COLORS.white, fontSize: 16, fontWeight: '900' },
+  experienceDuration: { color: COLORS.textMuted, fontSize: 12, fontWeight: '800' },
+  experienceDesc: { color: COLORS.textSoft, fontSize: 12, lineHeight: 17, marginTop: 3 },
+  removeButton: { width: 36, height: 36, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.dangerBg },
+  secondaryButton: { minHeight: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 15, borderWidth: 1, borderColor: 'rgba(124,92,255,0.45)', backgroundColor: 'rgba(124,92,255,0.12)' },
+  secondaryButtonText: { color: COLORS.primarySoft, fontWeight: '900' },
+  saveDock: { padding: 18, borderRadius: 24, backgroundColor: COLORS.cardRaised, borderWidth: 1, borderColor: COLORS.border, gap: 14 },
+  saveCopy: { gap: 3 },
+  saveTitle: { color: COLORS.white, fontSize: 18, fontWeight: '900' },
+  saveSubtitle: { color: COLORS.textMuted, fontSize: 12, lineHeight: 17 },
+  saveTouch: { width: '100%' },
+  saveButton: { minHeight: 54, borderRadius: 17, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
+  saveButtonText: { color: COLORS.white, fontSize: 15, fontWeight: '900' },
 });

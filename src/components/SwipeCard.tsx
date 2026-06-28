@@ -15,9 +15,10 @@ type SwipeCardProps = {
   onSwipeLeft: () => void;
   onSwipeRight: () => void;
   bottomSpacing?: number;
+  cardHeight?: number;
 };
 
-export default function SwipeCard({ children, onSwipeLeft, onSwipeRight, bottomSpacing = 100 }: SwipeCardProps) {
+export default function SwipeCard({ children, onSwipeLeft, onSwipeRight, bottomSpacing = 100, cardHeight }: SwipeCardProps) {
   const position = useRef(new Animated.ValueXY()).current;
 
   // Reset position when callbacks change (new card)
@@ -128,7 +129,7 @@ export default function SwipeCard({ children, onSwipeLeft, onSwipeRight, bottomS
 
   const { width, height } = useWindowDimensions();
   const cardWidth = Math.min(Math.max(width * 0.9, 320), 430);
-  const cardHeight = Math.min(Math.max(height * 0.68, 520), 680);
+  const resolvedCardHeight = cardHeight ?? Math.min(Math.max(height * 0.68, 520), 680);
 
   return (
     <Animated.View
@@ -137,7 +138,8 @@ export default function SwipeCard({ children, onSwipeLeft, onSwipeRight, bottomS
         styles.wrapper,
         {
           width: cardWidth,
-          height: cardHeight,
+          height: resolvedCardHeight,
+          minHeight: cardHeight ? 0 : 520,
           marginBottom: bottomSpacing,
           transform: [
             { translateX: position.x },

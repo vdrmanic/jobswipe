@@ -75,7 +75,7 @@ export default function MatchesScreen({ navigation }: any) {
       setRefreshing(false);
     } catch (error) {
       console.log('MATCHES ERROR:', error);
-      Alert.alert('Greska', 'Nije moguce ucitati meceve');
+      Alert.alert('Greška', 'Nije moguće učitati mečeve');
       setMatches([]);
       setLoading(false);
       setRefreshing(false);
@@ -124,7 +124,7 @@ export default function MatchesScreen({ navigation }: any) {
       <LinearGradient colors={[COLORS.dark, '#111827', COLORS.dark]} style={StyleSheet.absoluteFill} />
       <View style={styles.hero}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.header}>Mecevi</Text>
+          <Text style={styles.header}>Mečevi</Text>
           <Text style={styles.subtitle}>Konverzacije gde su obe strane rekle da.</Text>
         </View>
         <View style={styles.heroIcon}>
@@ -154,9 +154,9 @@ export default function MatchesScreen({ navigation }: any) {
             <View style={styles.emptyIcon}>
               <Ionicons name="sparkles" size={28} color={COLORS.primarySoft} />
             </View>
-            <Text style={styles.emptyTitle}>Jos nema meceva</Text>
+            <Text style={styles.emptyTitle}>Još nema mečeva</Text>
             <Text style={styles.emptyText}>
-              Kad obe strane kliknu "Svidja mi se", pojavice se ovde.
+              Kad obe strane kliknu "Sviđa mi se", pojaviše se ovde.
             </Text>
           </View>
         }
@@ -188,9 +188,18 @@ export default function MatchesScreen({ navigation }: any) {
             </View>
 
             {!!item.jobLocation && <Text style={styles.meta}>Lokacija posla: {item.jobLocation}</Text>}
+            {!!item.pipeline_stage && (
+              <View style={styles.pipelinePill}>
+                <Ionicons name="git-branch-outline" size={14} color={COLORS.primarySoft} />
+                <Text style={styles.pipelineText}>
+                  {({ new: 'Novi match', contacted: 'Kontaktiran', interview: 'Intervju', offer: 'Ponuda', rejected: 'Proces završen' } as Record<string, string>)[item.pipeline_stage] || item.pipeline_stage}
+                </Text>
+              </View>
+            )}
+            {!!item.interview_at && <Text style={styles.interviewText}>Intervju: {formatDateTime(item.interview_at)}</Text>}
 
             {item.unreadCount > 0 ? (
-              <Text style={styles.unreadText}>Nova poruka ceka odgovor</Text>
+              <Text style={styles.unreadText}>Nova poruka čeka odgovor</Text>
             ) : (
               <Text style={styles.matchDate}>Nema novih poruka - {formatDateTime(item.created_at)}</Text>
             )}
@@ -296,6 +305,9 @@ const styles = StyleSheet.create({
   },
   name: { color: COLORS.white, fontSize: 20, fontWeight: '900', marginBottom: 3 },
   meta: { color: COLORS.textMuted, marginTop: 5, fontSize: 13, lineHeight: 18 },
+  pipelinePill: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, backgroundColor: 'rgba(108,99,255,0.12)', borderWidth: 1, borderColor: 'rgba(157,167,255,0.20)' },
+  pipelineText: { color: COLORS.primarySoft, fontSize: 11, fontWeight: '900' },
+  interviewText: { color: COLORS.gold, marginTop: 8, fontSize: 12, fontWeight: '800' },
   jobPill: {
     alignSelf: 'flex-start',
     flexDirection: 'row',

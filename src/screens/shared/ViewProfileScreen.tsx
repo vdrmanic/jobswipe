@@ -14,11 +14,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
-import { ExperienceItem, ExperienceVerification } from '../../types';
+import { ExperienceItem, ExperienceVerification, ProfileVideo } from '../../types';
 import { findExperienceVerification, verificationService } from '../../services/verificationService';
 import { COLORS } from '../../constants';
 import { useAuth } from '../../hooks/useAuth';
 import ReportUserModal from '../../components/ReportUserModal';
+import { profileVideoService } from '../../services/profileVideoService';
+import ProfileVideoCard from '../../components/ProfileVideoCard';
 
 type InfoCardProps = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -49,6 +51,7 @@ export default function ViewProfileScreen({ route, navigation }: any) {
   const [details, setDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [verifications, setVerifications] = useState<ExperienceVerification[]>([]);
+  const [profileVideos, setProfileVideos] = useState<ProfileVideo[]>([]);
 
   const isCompany = userType === 'company';
   const isWide = width >= 760;
@@ -65,13 +68,17 @@ export default function ViewProfileScreen({ route, navigation }: any) {
         .maybeSingle(),
     ]);
 
-    const verificationRows = isCompany
-      ? []
-      : await verificationService.fetchPublicVerifiedExperiences([profileId]).catch(() => []);
+    const [verificationRows, videoRows] = await Promise.all([
+      isCompany
+        ? Promise.resolve([] as ExperienceVerification[])
+        : verificationService.fetchPublicVerifiedExperiences([profileId]).catch(() => []),
+      isCompany ? Promise.resolve([]) : profileVideoService.fetchProfileVideos(profileId).catch(() => []),
+    ]);
 
     setBaseProfile(profileData);
     setDetails(detailsData);
     setVerifications(verificationRows);
+    setProfileVideos(videoRows);
     setLoading(false);
   };
 
@@ -149,8 +156,8 @@ export default function ViewProfileScreen({ route, navigation }: any) {
               <Text selectable style={styles.name}>{displayName}</Text>
               <Text style={styles.tagline}>
                 {isCompany
-                  ? details?.industry || 'Tim koji trazi sledeceg sjajnog clana'
-                  : details?.position || 'Otvoren/a za novu poslovnu priliku'}
+                  ? details?.industry || 'Tim koji traži sledećeg sjajnog člana'
+                  : baseProfile?.location || 'Kandidat otvoren za dobre prilike'}
               </Text>
 
               <View style={styles.quickFacts}>
@@ -185,7 +192,7 @@ export default function ViewProfileScreen({ route, navigation }: any) {
                   </View>
                 </View>
                 <Text selectable style={styles.bio}>
-                  {baseProfile?.bio || 'Kompanija jos nije dodala detaljan opis, ali njihov aktivan oglas moze ti reci vise o timu i ulozi.'}
+                  {baseProfile?.bio || 'Kompanija još nije dodala detaljan opis, ali njihov aktivan oglas može ti reći više o timu i ulozi.'}
                 </Text>
               </View>
 
@@ -194,9 +201,9 @@ export default function ViewProfileScreen({ route, navigation }: any) {
                   <Ionicons name="rocket" size={24} color={COLORS.primarySoft} />
                 </View>
                 <View style={styles.whyCopy}>
-                  <Text style={styles.whyTitle}>Mozda je ovo tvoj sledeci tim</Text>
+                  <Text style={styles.whyTitle}>Možda je ovo tvoj sledeći tim</Text>
                   <Text style={styles.whyText}>
-                    Pregledaj kulturu, lokaciju i osnovne podatke, pa se vrati na oglas kada budes spreman za swipe.
+                    Pregledaj kulturu, lokaciju i osnovne podatke, pa se vrati na oglas kada budeš spreman za swipe.
                   </Text>
                 </View>
               </LinearGradient>
@@ -209,7 +216,7 @@ export default function ViewProfileScreen({ route, navigation }: any) {
                 <View style={styles.infoList}>
                   <InfoCard icon="business-outline" label="Naziv" value={details?.company_name} />
                   <InfoCard icon="layers-outline" label="Industrija" value={details?.industry} />
-                  <InfoCard icon="people-outline" label="Velicina tima" value={details?.company_size} />
+            <InfoCard icon="people-outline" label="Veličina tima" value={details?.company_size} />
                   <InfoCard icon="location-outline" label="Lokacija" value={baseProfile?.location} />
                 </View>
 
@@ -225,16 +232,28 @@ export default function ViewProfileScreen({ route, navigation }: any) {
           </View>
         ) : (
           <View style={styles.candidateContent}>
+            {!!profileVideos.length && (
+              <View style={styles.section}>
+                <Text style={styles.sectionEyebrow}>VIDEO</Text>
+                <Text style={styles.sectionTitle}>Video predstavljanje</Text>
+                <View style={styles.videoList}>
+                  {profileVideos.map((video) => (
+                    <ProfileVideoCard key={video.id} video={video} />
+                  ))}
+                </View>
+              </View>
+            )}
+
             <View style={styles.section}>
               <Text style={styles.sectionEyebrow}>PROFIL</Text>
               <Text style={styles.sectionTitle}>O kandidatu</Text>
-              <Text selectable style={styles.bio}>{baseProfile?.bio || 'Kandidat jos nije dodao opis.'}</Text>
+              <Text selectable style={styles.bio}>{baseProfile?.bio || 'Kandidat još nije dodao opis.'}</Text>
             </View>
 
             {!!details?.skills?.length && (
               <View style={styles.section}>
                 <Text style={styles.sectionEyebrow}>KOMPETENCIJE</Text>
-                <Text style={styles.sectionTitle}>Vestine</Text>
+                <Text style={styles.sectionTitle}>Veštine</Text>
                 <View style={styles.tags}>
                   {details.skills.map((skill: string, index: number) => (
                     <View key={`${skill}-${index}`} style={styles.tag}>
@@ -276,7 +295,7 @@ export default function ViewProfileScreen({ route, navigation }: any) {
                     );
                   })
                 ) : (
-                  <Text style={styles.emptyText}>Iskustvo jos nije dodato.</Text>
+                  <Text style={styles.emptyText}>Iskustvo još nije dodato.</Text>
                 )}
               </View>
             </View>
@@ -349,6 +368,7 @@ const styles = StyleSheet.create({
   sectionHeadingCopy: { flex: 1 },
   sectionEyebrow: { color: COLORS.primarySoft, fontSize: 10, lineHeight: 14, fontWeight: '900', letterSpacing: 1.15 },
   sectionTitle: { color: COLORS.white, fontSize: 21, lineHeight: 27, fontWeight: '900', marginTop: 3 },
+  videoList: { gap: 12, marginTop: 16 },
   bio: { color: COLORS.textMuted, fontSize: 15, lineHeight: 24, marginTop: 16 },
   whyCard: { flexDirection: 'row', gap: 14, padding: 20, borderRadius: 24, borderCurve: 'continuous', borderWidth: 1, borderColor: 'rgba(124,92,255,0.26)' },
   whyIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(124,92,255,0.19)' },

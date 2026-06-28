@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { CopilotStep, useCopilot, walkthroughable } from 'react-native-copilot';
 import SwipeCard from '../../components/SwipeCard';
 import MatchCelebration from '../../components/MatchCelebration';
 import { useAuth } from '../../hooks/useAuth';
@@ -28,6 +29,9 @@ import MatchScorePill from '../../components/MatchScorePill';
 import { discoveryService, notificationService, safetyService } from '../../services';
 import { defaultDiscoveryFilters, jobPassesFilters, scoreJobForCandidate } from '../../utils/matching';
 import { CandidateProfile, DiscoveryFilters, MatchScore } from '../../types';
+import { isTutorialPausedForFilter, openTutorialTab, requestProfileTutorial, setTutorialPausedForFilter } from '../../utils/tutorial-flow';
+
+const CopilotView = walkthroughable(View);
 
 type JobWithCompany = JobListing & {
   companyName?: string;
@@ -35,6 +39,9 @@ type JobWithCompany = JobListing & {
   companyAvatar?: string | null;
   matchScore: MatchScore;
 };
+
+const isJobBoosted = (job: Pick<JobListing, 'boost_until'>) =>
+  !!job.boost_until && new Date(job.boost_until).getTime() > Date.now();
 
 const LOCAL_CITY_COORDS: Array<{ keys: string[]; lat: number; lon: number }> = [
   { keys: ['beograd', 'belgrade', 'novi beograd', 'zemun'], lat: 44.8125, lon: 20.4612 },
@@ -85,6 +92,7 @@ export default function CandidateSwipeScreen({navigation}: any) {
   const { user, profile } = useAuth();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const { copilotEvents, stop } = useCopilot();
 
   const [jobs, setJobs] = useState<JobWithCompany[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -95,6 +103,7 @@ export default function CandidateSwipeScreen({navigation}: any) {
   const [matchedJob, setMatchedJob] = useState<JobWithCompany | null>(null);
   const [filters, setFilters] = useState<DiscoveryFilters>(defaultDiscoveryFilters);
   const [filtersVisible, setFiltersVisible] = useState(false);
+  const [filterTutorialActive, setFilterTutorialActive] = useState(false);
   const [distanceLabel, setDistanceLabel] = useState<string | null>(null);
   const distanceCacheRef = useRef({ candidateLocation: '', jobLocation: '' });
   const geocodeCacheRef = useRef<Record<string, { lat: number; lon: number } | null>>({});
@@ -108,10 +117,50 @@ export default function CandidateSwipeScreen({navigation}: any) {
 
   const visibleJobs = jobs.filter((job) => jobPassesFilters(job, filters, job.matchScore.score));
   const currentJob = visibleJobs[currentIndex];
+
+  useEffect(() => {
+    if (!user || !currentJob) return;
+    supabase.from('job_view_events').upsert(
+      { job_id: currentJob.id, candidate_id: user.id },
+      { onConflict: 'job_id,candidate_id', ignoreDuplicates: true }
+    ).then(() => undefined);
+  }, [currentJob?.id, user?.id]);
   const isCompact = height < 760 || width < 380;
   const visibleSkills = currentJob?.skills_required?.slice(0, isCompact ? 4 : 6) || [];
   const hiddenSkillCount = Math.max((currentJob?.skills_required?.length || 0) - visibleSkills.length, 0);
   const deckProgress = visibleJobs.length > 0 ? Math.min((currentIndex + 1) / visibleJobs.length, 1) : 0;
+
+  useEffect(() => {
+    const handleStepChange = (step: { name?: string } | undefined) => {
+      const isFilterStep = step?.name === 'korak-Filteri i broj oglasa';
+      setFilterTutorialActive(isFilterStep);
+      if (isFilterStep) {
+        setTutorialPausedForFilter(true);
+        setFiltersVisible(true);
+        setTimeout(() => { void stop(); }, 0);
+      }
+    };
+    const handleStop = () => {
+      if (isTutorialPausedForFilter()) return;
+      setFilterTutorialActive(false);
+      setFiltersVisible(false);
+    };
+    copilotEvents.on('stepChange', handleStepChange);
+    copilotEvents.on('stop', handleStop);
+    return () => {
+      copilotEvents.off('stepChange', handleStepChange);
+      copilotEvents.off('stop', handleStop);
+    };
+  }, [copilotEvents, stop]);
+
+  const continueFromFilterTutorial = () => {
+    setFilterTutorialActive(false);
+    setFiltersVisible(false);
+    setTutorialPausedForFilter(false);
+    requestProfileTutorial();
+    openTutorialTab('Profile');
+    navigation.getParent()?.navigate('Profile');
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -332,6 +381,7 @@ export default function CandidateSwipeScreen({navigation}: any) {
       candidateName={profile?.full_name}
       companyAvatar={matchedJob?.companyAvatar}
       companyName={matchName}
+      jobTitle={matchedJob?.title}
       onContinue={() => {
         setMatchVisible(false);
         setMatchedJob(null);
@@ -364,7 +414,7 @@ export default function CandidateSwipeScreen({navigation}: any) {
       .select('*')
       .eq('id', user.id)
       .maybeSingle();
-    const candidateProfile = (candidateData || { position: null, skills: [], job_type: [] }) as CandidateProfile;
+    const candidateProfile = (candidateData || { position: null, skills: [], job_type: [], experience_items: [] }) as CandidateProfile;
 
     const { data: swipedData, error: swipesError } = await supabase
       .from('swipes')
@@ -400,7 +450,11 @@ export default function CandidateSwipeScreen({navigation}: any) {
       return;
     }
 
-    const availableJobs = (jobsData || []).filter((job) => !blockedIds.includes(job.company_id));
+    const now = Date.now();
+    const availableJobs = (jobsData || []).filter((job) => {
+      const stillPaid = !job.expires_at || new Date(job.expires_at).getTime() > now;
+      return stillPaid && !blockedIds.includes(job.company_id);
+    });
     const companyIds = [...new Set(availableJobs.map((job) => job.company_id))];
 
     let companyMap: Record<
@@ -446,13 +500,21 @@ export default function CandidateSwipeScreen({navigation}: any) {
       }, {} as Record<string, { company_name: string | null; industry: string | null; avatar_url: string | null }>);
     }
 
-    const preparedJobs: JobWithCompany[] = availableJobs.map((job) => ({
-      ...job,
-      companyName: companyMap[job.company_id]?.company_name || 'Firma',
-      companyIndustry: companyMap[job.company_id]?.industry || null,
-      companyAvatar: companyMap[job.company_id]?.avatar_url || null,
-      matchScore: scoreJobForCandidate(job, candidateProfile, profile?.location),
-    }));
+    const preparedJobs: JobWithCompany[] = availableJobs
+      .map((job) => ({
+        ...job,
+        companyName: companyMap[job.company_id]?.company_name || 'Firma',
+        companyIndustry: companyMap[job.company_id]?.industry || null,
+        companyAvatar: companyMap[job.company_id]?.avatar_url || null,
+        matchScore: scoreJobForCandidate(job, candidateProfile, profile?.location),
+      }))
+      .sort((left, right) => {
+        const leftBoost = isJobBoosted(left) ? 1 : 0;
+        const rightBoost = isJobBoosted(right) ? 1 : 0;
+        if (leftBoost !== rightBoost) return rightBoost - leftBoost;
+        if (left.matchScore.score !== right.matchScore.score) return right.matchScore.score - left.matchScore.score;
+        return new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
+      });
 
     setJobs(preparedJobs);
     setCurrentIndex(0);
@@ -461,6 +523,7 @@ export default function CandidateSwipeScreen({navigation}: any) {
 
   useFocusEffect(
     useCallback(() => {
+      if (isTutorialPausedForFilter()) return;
       fetchJobs();
     }, [user?.id])
   );
@@ -558,6 +621,7 @@ export default function CandidateSwipeScreen({navigation}: any) {
       .eq('swiper_id', companyId)
       .eq('target_type', 'candidate')
       .eq('target_id', candidateId)
+      .eq('job_id', jobId)
       .eq('direction', 'right')
       .limit(1);
 
@@ -593,11 +657,11 @@ export default function CandidateSwipeScreen({navigation}: any) {
       return false;
     }
 
-    const { error: matchError } = await supabase.from('matches').insert({
+    const { data: matchData, error: matchError } = await supabase.from('matches').insert({
       candidate_id: candidateId,
       company_id: companyId,
       job_id: jobId,
-    });
+    }).select('id').single();
 
     if (matchError) {
       console.warn('Candidate match insert failed:', matchError.message, { candidateId, companyId, jobId });
@@ -623,9 +687,11 @@ export default function CandidateSwipeScreen({navigation}: any) {
         target_id: currentJob.id,
         target_type: 'job',
         direction,
+        job_id: currentJob.id,
+        decided_at: new Date().toISOString(),
       },
       {
-        onConflict: 'swiper_id,target_id',
+        onConflict: 'swiper_id,target_id,target_type,job_id',
       }
     ).select();
 
@@ -722,12 +788,18 @@ export default function CandidateSwipeScreen({navigation}: any) {
 
         </View>
 
-        <View style={styles.countPill}>
+        <CopilotStep
+          order={3}
+          name="korak-Filteri i broj oglasa"
+          text="Broj pokazuje koji oglas trenutno gledaš i koliko ih još ima. Dodirni ikonicu sa klizačima da biraš lokaciju, način rada, tip posla, platu i minimalni procenat poklapanja."
+        >
+        <CopilotView collapsable={false} style={styles.countPill}>
           <TouchableOpacity style={styles.filterButton} onPress={() => setFiltersVisible(true)}>
             <Ionicons name="options" size={18} color={COLORS.primarySoft} />
           </TouchableOpacity>
           <Text style={styles.countText}>{currentIndex + 1}/{visibleJobs.length}</Text>
-        </View>
+        </CopilotView>
+        </CopilotStep>
       </View>
 
       <View style={styles.progressTrack}>
@@ -794,7 +866,12 @@ export default function CandidateSwipeScreen({navigation}: any) {
               </View>
             </View>
 
-            <View style={styles.cardContent}>
+            <CopilotStep
+              order={1}
+              name="korak-Oglasi za tebe"
+              text="Na kartici vidiš firmu, poziciju, lokaciju, uslove i procenat poklapanja sa tvojim profilom. Prevuci desno ako želiš da se prijaviš, levo da preskočiš, a dodirni karticu za ceo oglas i profil firme."
+            >
+            <CopilotView collapsable={false} style={styles.cardContent}>
               <View style={styles.jobIdentityRow}>
                 <View style={styles.companyLabel}>
                   <Ionicons name="business-outline" size={15} color={COLORS.accent} />
@@ -802,6 +879,13 @@ export default function CandidateSwipeScreen({navigation}: any) {
                     {currentJob.companyName}
                   </Text>
                 </View>
+
+                {isJobBoosted(currentJob) && (
+                  <View style={styles.boostedPill}>
+                    <Ionicons name="flame" size={13} color="#FFD08A" />
+                    <Text style={styles.boostedPillText}>Boost</Text>
+                  </View>
+                )}
 
                 {!!currentJob.job_type && (
                   <View style={styles.jobTypePill}>
@@ -824,6 +908,13 @@ export default function CandidateSwipeScreen({navigation}: any) {
                 📍 {currentJob.location || 'Lokacija nije navedena'}
                 {distanceLabel ? ` • ${distanceLabel}` : ''}
               </Text>
+              <View style={styles.richMetaRow}>
+                {!!currentJob.work_mode && <Text style={styles.richMeta}>⌂ {currentJob.work_mode}</Text>}
+                {!!currentJob.seniority && <Text style={styles.richMeta}>✦ {currentJob.seniority}</Text>}
+                {(currentJob.salary_min || currentJob.salary_max) && (
+                  <Text style={[styles.richMeta, styles.salaryMeta]}>{currentJob.salary_min || 0}–{currentJob.salary_max || '∞'} EUR</Text>
+                )}
+              </View>
 
               {false && jobLocationCoords ? (
                 <View style={[styles.jobMapCard, styles.hiddenMapCard]}>
@@ -875,7 +966,8 @@ export default function CandidateSwipeScreen({navigation}: any) {
                 </Text>
               )}
 
-            </View>
+            </CopilotView>
+            </CopilotStep>
           </TouchableOpacity>
         </LinearGradient>
       </SwipeCard>
@@ -923,6 +1015,11 @@ export default function CandidateSwipeScreen({navigation}: any) {
                 </View>
               )}
 
+              {!!currentJob.work_mode && <View style={styles.jobModalMetaRow}><Ionicons name="home-outline" size={17} color={COLORS.primarySoft} /><Text style={styles.jobModalMetaText}>{currentJob.work_mode}</Text></View>}
+              {!!currentJob.seniority && <View style={styles.jobModalMetaRow}><Ionicons name="ribbon-outline" size={17} color={COLORS.mint} /><Text style={styles.jobModalMetaText}>{currentJob.seniority}</Text></View>}
+              {(currentJob.salary_min || currentJob.salary_max) && <View style={styles.jobModalMetaRow}><Ionicons name="cash-outline" size={17} color={COLORS.mint} /><Text style={styles.jobModalMetaText}>{currentJob.salary_min || 0}–{currentJob.salary_max || '∞'} EUR mesečno</Text></View>}
+              {!!currentJob.schedule && <View style={styles.jobModalMetaRow}><Ionicons name="calendar-outline" size={17} color={COLORS.gold} /><Text style={styles.jobModalMetaText}>{currentJob.schedule}</Text></View>}
+
               {!!currentJob.description && (
                 <View style={styles.jobModalSection}>
                   <Text style={styles.jobModalSectionTitle}>Opis posla</Text>
@@ -932,7 +1029,7 @@ export default function CandidateSwipeScreen({navigation}: any) {
 
               {!!currentJob.skills_required?.length && (
                 <View style={styles.jobModalSection}>
-                  <Text style={styles.jobModalSectionTitle}>Potrebne vestine</Text>
+                  <Text style={styles.jobModalSectionTitle}>Potrebne veštine</Text>
                   <View style={styles.jobModalSkills}>
                     {currentJob.skills_required.map((skill, index) => (
                       <View key={`${skill}-modal-${index}`} style={styles.jobModalSkill}>
@@ -940,6 +1037,12 @@ export default function CandidateSwipeScreen({navigation}: any) {
                       </View>
                     ))}
                   </View>
+                </View>
+              )}
+              {!!currentJob.benefits?.length && (
+                <View style={styles.jobModalSection}>
+                  <Text style={styles.jobModalSectionTitle}>Benefiti</Text>
+                  <Text style={styles.jobModalDescription}>{currentJob.benefits.join(' • ')}</Text>
                 </View>
               )}
             </ScrollView>
@@ -968,12 +1071,15 @@ export default function CandidateSwipeScreen({navigation}: any) {
         visible={filtersVisible}
         mode="candidate"
         value={filters}
-        onClose={() => setFiltersVisible(false)}
+        tutorialActive={filterTutorialActive}
+        onTutorialNext={continueFromFilterTutorial}
+        onClose={filterTutorialActive ? continueFromFilterTutorial : () => setFiltersVisible(false)}
         onApply={(next) => {
           setFilters(next);
           setCurrentIndex(0);
-          setFiltersVisible(false);
           if (user) discoveryService.saveFilters(user.id, 'candidate', next);
+          if (filterTutorialActive) continueFromFilterTutorial();
+          else setFiltersVisible(false);
         }}
       />
     </View>
@@ -1009,12 +1115,12 @@ const styles = StyleSheet.create({
     elevation: 14,
   },
   mapHero: {
-    ...StyleSheet.absoluteFill,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: '#111827',
     overflow: 'hidden',
   },
   mapScrim: {
-    ...StyleSheet.absoluteFill,
+    ...StyleSheet.absoluteFillObject,
   },
   mapHeroFallback: {
     width: '100%',
@@ -1122,6 +1228,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     overflow: 'hidden',
   },
+  richMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
+  richMeta: { color: '#c9cde0', fontSize: 10, fontWeight: '800', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.07)' },
+  salaryMeta: { color: '#6ee7b7', backgroundColor: 'rgba(110,231,183,0.10)' },
   description: { color: '#DCE2F5', fontSize: 13, lineHeight: 20, marginTop: 4 },
   cardTop: {
     flexDirection: 'column',
@@ -1175,6 +1284,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
   },
+  boostedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,184,107,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,184,107,0.34)',
+  },
+  boostedPillText: { color: '#FFD08A', fontSize: 11, fontWeight: '900' },
   cardTouch: {
     width: '100%',
     flex: 1,

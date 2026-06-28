@@ -1,13 +1,17 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Platform } from 'react-native';
+import { useEffect } from 'react';
+import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { CopilotProvider, CopilotStep, walkthroughable } from 'react-native-copilot';
 
 import CandidateSwipeScreen from '../screens/candidate/CandidateSwipeScreen';
 import CompanyJobsScreen from '../screens/company/CompanyJobsScreen';
 import CompanySwipeScreen from '../screens/company/CompanySwipeScreen';
 import CreateJobScreen from '../screens/company/CreateJobScreen';
+import CreditStoreScreen from '../screens/company/CreditStoreScreen';
+import JobDashboardScreen from '../screens/company/JobDashboardScreen';
 import ChatScreen from '../screens/shared/ChatScreen';
 import EditProfileScreen from '../screens/shared/EditProfileScreen';
 import MatchesScreen from '../screens/shared/MatchesScreen';
@@ -21,15 +25,57 @@ import ReportsAdminScreen from '../screens/admin/ReportsAdminScreen';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useAuth } from '../hooks/useAuth';
 import { COLORS } from '../constants';
+import FirstLoginTutorial, { JobHopTutorialTooltip } from '../components/first-login-tutorial';
+import { registerTutorialTab } from '../utils/tutorial-flow';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+const CopilotView = walkthroughable(View);
+const EmptyStepNumber = () => null;
+
+function TutorialTabButton({ routeName, userType, children, style, onPress, onLongPress, accessibilityState, accessibilityLabel, testID }: any) {
+  useEffect(() => registerTutorialTab(routeName, onPress), [onPress, routeName]);
+
+  const configs: Record<string, { order: number; name: string; text: string }> = userType === 'company'
+    ? {
+        Jobs: { order: 3, name: 'korak-Oglasi i analitika', text: 'Ovde kreiraš novi oglas, menjaš postojeće i pratiš rezultate svakog oglasa posebno. Prvo objavi oglas, pa ćeš za njega videti kandidate, analitiku i status u procesu zapošljavanja.' },
+        Swipe: { order: 4, name: 'korak-Kandidati za oglas', text: 'Kada objaviš oglas, u ovom tabu biraš za koji oglas tražiš radnika, vidiš procenat poklapanja i prevlačiš desno ako ti kandidat odgovara ili levo ako ga preskačeš.' },
+        Matches: { order: 5, name: 'korak-Mečevi i razgovori', text: 'Kada i kandidat i firma pokažu interesovanje za isti oglas, ovde nastaje meč. Odavde otvaraš razgovor, dogovaraš intervju i vodiš komunikaciju.' },
+        Profile: { order: 6, name: 'korak-Profil firme', text: 'Ovde je javni profil firme. Ikonica olovke otvara uređivanje naziva, opisa, lokacije, industrije i fotografije firme. Sada ćemo otvoriti taj deo.' },
+      }
+    : {
+        Matches: { order: 2, name: 'korak-Tvoji mečevi', text: 'Meč nastaje tek kada i ti i firma pokažete interesovanje. Ovde vidiš sve mečeve, otvaraš razgovor sa firmom i pratiš dogovor oko narednih koraka.' },
+        Profile: { order: 4, name: 'korak-Tvoj profil', text: 'Dodaj veštine, iskustvo, lokaciju i kratak opis. Što je profil potpuniji, procenat poklapanja je precizniji i firme lakše vide zašto im odgovaraš.' },
+      };
+  const config = configs[routeName];
+  const button = (
+    <CopilotView collapsable={false} style={style}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={accessibilityState}
+        accessibilityLabel={accessibilityLabel}
+        testID={testID}
+        onPress={onPress}
+        onLongPress={onLongPress}
+        style={({ pressed }) => ({ flex: 1, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}
+      >
+        {children}
+      </Pressable>
+    </CopilotView>
+  );
+
+  return config ? <CopilotStep {...config}>{button}</CopilotStep> : button;
+}
 
 function CompanyJobsStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="CompanyJobs" component={CompanyJobsScreen} />
+      <Stack.Screen name="CreditStore" component={CreditStoreScreen} />
       <Stack.Screen name="CreateJob" component={CreateJobScreen} />
+      <Stack.Screen name="JobDashboard" component={JobDashboardScreen} />
+      <Stack.Screen name="Chat" component={ChatScreen} />
+      <Stack.Screen name="ViewProfile" component={ViewProfileScreen} />
     </Stack.Navigator>
   );
 }
@@ -73,17 +119,37 @@ function ProfileStack() {
 
 export default function MainTabs() {
   const { profile } = useAuth();
+  const { width } = useWindowDimensions();
   const isCompany = profile?.user_type === 'company';
   const unreadCount = useUnreadMessages();
 
   return (
-    <Tab.Navigator
+    <CopilotProvider
+      overlay="view"
+      animated={false}
+      backdropColor="rgba(3,4,9,0.88)"
+      margin={8}
+      tooltipComponent={JobHopTutorialTooltip}
+      tooltipStyle={{
+        backgroundColor: 'transparent',
+        paddingTop: 0,
+        paddingHorizontal: 0,
+        left: 16,
+        right: 16,
+        maxWidth: Math.max(width - 32, 240),
+      }}
+      stepNumberComponent={EmptyStepNumber}
+      arrowColor="#121622"
+      labels={{ next: 'Nastavi', skip: 'Preskoči', finish: 'Završi' }}
+    >
+      <Tab.Navigator
       screenOptions={({ route }) => {
         const focusedRoute = getFocusedRouteNameFromRoute(route);
-        const hideTabBar = ['Chat', 'ViewProfile', 'ExperienceVerification', 'VerificationAdmin', 'Notifications', 'ReportsAdmin'].includes(focusedRoute || '');
+        const hideTabBar = ['Chat', 'ViewProfile', 'CreateJob', 'CreditStore', 'JobDashboard', 'ExperienceVerification', 'VerificationAdmin', 'Notifications', 'ReportsAdmin'].includes(focusedRoute || '');
 
         return {
         headerShown: false,
+        tabBarButton: (props) => <TutorialTabButton {...props} routeName={route.name} userType={profile?.user_type} />,
         tabBarShowLabel: true,
         tabBarStyle: hideTabBar ? { display: 'none' } : {
           position: 'absolute',
@@ -163,6 +229,8 @@ export default function MainTabs() {
         component={ProfileStack}
         options={{ tabBarLabel: 'Profil' }}
       />
-    </Tab.Navigator>
+      </Tab.Navigator>
+      {!!profile?.id && <FirstLoginTutorial userId={profile.id} userType={profile.user_type} />}
+    </CopilotProvider>
   );
 }

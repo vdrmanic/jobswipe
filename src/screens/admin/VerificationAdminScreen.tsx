@@ -14,6 +14,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants';
+import { INPUT_LIMITS } from '../../constants/inputLimits';
 import { useAuth } from '../../hooks/useAuth';
 import { verificationService } from '../../services';
 import { ExperienceVerification, ExperienceVerificationStatus } from '../../types';
@@ -40,7 +41,7 @@ export default function VerificationAdminScreen({ navigation }: any) {
       if (!isAdmin) return;
       setRequests(await verificationService.fetchReviewQueue(filter));
     } catch (error: any) {
-      Alert.alert('Greska', error?.message || 'Nije moguce ucitati zahteve.');
+      Alert.alert('Greška', error?.message || 'Nije moguće učitati zahteve.');
     } finally {
       setLoading(false);
     }
@@ -57,7 +58,7 @@ export default function VerificationAdminScreen({ navigation }: any) {
       const url = await verificationService.createDocumentUrl(request.document_path);
       await Linking.openURL(url);
     } catch (error: any) {
-      Alert.alert('Dokument nije dostupan', error?.message || 'Pokusaj ponovo.');
+      Alert.alert('Dokument nije dostupan', error?.message || 'Pokušaj ponovo.');
     }
   };
 
@@ -71,7 +72,7 @@ export default function VerificationAdminScreen({ navigation }: any) {
     if (!selected) return;
 
     if (reviewAction !== 'verified' && !reviewNote.trim()) {
-      Alert.alert('Dodaj razlog', 'Kandidat mora da zna zasto zahtev nije odobren.');
+      Alert.alert('Dodaj razlog', 'Kandidat mora da zna zašto zahtev nije odobren.');
       return;
     }
 
@@ -86,7 +87,7 @@ export default function VerificationAdminScreen({ navigation }: any) {
       setReviewNote('');
       await load();
     } catch (error: any) {
-      Alert.alert('Greska', error?.message || 'Provera nije sacuvana.');
+      Alert.alert('Greška', error?.message || 'Provera nije sačuvana.');
     } finally {
       setReviewing(null);
     }
@@ -119,7 +120,7 @@ export default function VerificationAdminScreen({ navigation }: any) {
           <Ionicons name="chevron-back" size={22} color={COLORS.primarySoft} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={styles.eyebrow}>JobSwipe admin</Text>
+          <Text style={styles.eyebrow}>JobHop admin</Text>
           <Text style={styles.title}>Provera iskustava</Text>
         </View>
       </View>
@@ -132,7 +133,7 @@ export default function VerificationAdminScreen({ navigation }: any) {
             onPress={() => setFilter(value)}
           >
             <Text style={[styles.filterText, filter === value && styles.filterTextActive]}>
-              {value === 'pending' ? 'Na cekanju' : 'Svi zahtevi'}
+                  {value === 'pending' ? 'Na čekanju' : 'Svi zahtevi'}
             </Text>
           </TouchableOpacity>
         ))}
@@ -204,11 +205,11 @@ export default function VerificationAdminScreen({ navigation }: any) {
                 ? 'Odobri iskustvo?'
                 : reviewAction === 'rejected'
                   ? 'Odbij zahtev'
-                  : 'Trazi novi dokument'}
+                  : 'Traži novi dokument'}
             </Text>
             <Text style={styles.modalSubtitle}>
               {reviewAction === 'verified'
-                ? 'Kandidat i firme ce videti oznaku da je ovo iskustvo verifikovano.'
+                  ? 'Kandidat i firme će videti oznaku da je ovo iskustvo verifikovano.'
                 : 'Napisi jasan razlog koji ce kandidat videti.'}
             </Text>
             {reviewAction !== 'verified' && (
@@ -218,6 +219,7 @@ export default function VerificationAdminScreen({ navigation }: any) {
                 placeholder="Razlog odluke"
                 placeholderTextColor={COLORS.lightGray}
                 style={styles.noteInput}
+                maxLength={INPUT_LIMITS.adminNote}
                 multiline
               />
             )}
